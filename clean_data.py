@@ -1,5 +1,18 @@
 import numpy as np
+from utils import HyperParameters
 import matplotlib.pyplot as plt
+from torch.utils.data import Dataset
+import torch
+
+class SketchesDataset(Dataset):
+    def __init__(self, sketches):
+        self.sketches = sketches
+
+    def __len__(self):
+        return len(self.sketches)
+    
+    def __getitem__(self, idx):
+        return torch.tensor(self.sketches[idx], dtype=torch.float32)
 
 def draw_sketch(stroke_data):
     """
@@ -47,7 +60,7 @@ def draw_sketch(stroke_data):
     # Show the drawing
     plt.show()
 
-def to_big_strokes(stroke, max_len=20000):
+def to_big_strokes(stroke, max_len=HyperParameters.MAX_STROKES):
   """Converts from stroke-3 to stroke-5 format and pads to given length."""
   # (But does not insert special start token).
 

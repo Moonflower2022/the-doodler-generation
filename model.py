@@ -1,5 +1,5 @@
 import torch
-from train import HyperParameters
+from utils import HyperParameters
 from torch import nn
 
 class SketchCell(nn.Module):
@@ -23,10 +23,10 @@ class SketchDecoder(nn.Module):
         self.lstm_cell = SketchCell(hyper_parameters)
 
     def forward(self):
-        output = torch.tensor([0, 0, 1, 0, 0], dtype=torch.float32).unsqueeze(0)
+        output = torch.tensor([0, 0, 1, 0, 0], dtype=torch.float32).to(self.hyper_parameters.DEVICE).unsqueeze(0)
 
         i = 0
-        while torch.argmax(output[-1][2:]) != torch.tensor(2) and i < hyper_parameters.MAX_STROKES:
+        while torch.argmax(output[-1][2:]) != torch.tensor(2, device=self.hyper_parameters.DEVICE) and i < self.hyper_parameters.MAX_STROKES:
             cell_output = self.lstm_cell(output[-1])
 
             gaussian_params = cell_output[:4]
@@ -37,23 +37,24 @@ class SketchDecoder(nn.Module):
             mu_x, sigma_x = gaussian_params[0], torch.exp(gaussian_params[1] / 2)
             mu_y, sigma_y = gaussian_params[2], torch.exp(gaussian_params[3] / 2)
 
-            # Sample from Gaussian distributions
-            gaussian_sample_x = torch.normal(mu_x, sigma_x)
-            gaussian_sample_y = torch.normal(mu_y, sigma_y)
+            gaussian_sample_x = torch.normal(mu_x, sigma_x).to(self.hyper_parameters.DEVICE)
+            gaussian_sample_y = torch.normal(mu_y, sigma_y).to(self.hyper_parameters.DEVICE)
 
-            # Concatenate the two Gaussian samples with the max value
-            output = torch.cat((output, torch.cat([torch.tensor([gaussian_sample_x, gaussian_sample_y]), softmax]).unsqueeze(0)), axis=0)
+            new_output = torch.cat([torch.tensor([gaussian_sample_x, gaussian_sample_y], device=self.hyper_parameters.DEVICE), softmax])
+            if i > 0:
+                output = torch.cat((output, new_output.unsqueeze(0)), axis=0)
             i += 1
+        
+        pad_tensor = torch.tensor([0, 0, 0, 0, 1], dtype=torch.float32, device=self.hyper_parameters.DEVICE).unsqueeze(0)
+        padding_needed = self.hyper_parameters.MAX_STROKES - output.size(0)
+        if padding_needed > 0:
+            padding = pad_tensor.repeat(padding_needed, 1)
+            output = torch.cat((output, padding), axis=0)
 
         return output
 
-# Reconstruction loss: You calculate the likelihood of the true ∆x and ∆y based on the predicted Gaussian mixture model.
-# Pen state loss: You use a categorical cross-entropy loss to predict the correct pen state.
-
 if __name__ == '__main__':
-    hyper_parameters = HyperParameters()
-
-    model = SketchDecoder(hyper_parameters)
+    model = SketchDecoder(HyperParameters()).to(HyperParameters.DEVICE)
 
     print(model)
 

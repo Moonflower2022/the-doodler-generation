@@ -1,53 +1,85 @@
-from utils import device
+from utils import get_ending_index, get_available_folder_name, HyperParameters
+from clean_data import SketchesDataset
+from model import SketchDecoder
 from torch import nn
-import ndjson
+from torch import optim
+import torch
+import numpy as np
+import os
+
+def reconstruction_loss(prediction, label):
+    
+    # ending_index is the last index up to which offset_loss will be applied.
+    ending_index = get_ending_index(label)
+    
+    # Separate pen states and offsets for predictions and labels
+    pred_pen_states = prediction[:, 2:]
+    label_pen_states = label[:, 2:]
+    
+    pred_offsets = prediction[:, :2]
+    label_offsets = label[:, :2]
+    
+    # Calculate pen state loss
+    pen_state_loss = torch.nn.functional.binary_cross_entropy(pred_pen_states, label_pen_states, reduction='sum')
+    
+    # Apply mask for offset loss
+    mask = torch.arange(label.size(0), device=label.device) <= ending_index
+    offset_loss = torch.nn.functional.binary_cross_entropy(pred_offsets[mask], label_offsets[mask], reduction='sum')
+    
+    # Average loss over MAX_STROKES for normalization
+    total_loss = -(pen_state_loss + offset_loss) / HyperParameters.MAX_STROKES
+    
+    return total_loss
 
 
-class HyperParameters:
-    INPUT_SIZE = 5
-    # ∆x,
-    # ∆y,
-    # pen down (pen is currently down),
-    # pen up (after this stroke, pen goes up),
-    # end (current point and subsequent points are voided)
-
-    HIDDEN_SIZE = 256
-    BIAS = True
-    MAX_STROKES = 2016
-
-
-log_loss = nn.CrossEntropyLoss()
-
-
-def get_ending_index(sketch):
-    for i, stroke in enumerate(sketch):
-        if stroke[-1] == 1:
-            return i
-    return -1
-
-
-def reconstruction_loss(predictions, labels):
-    # sum of log loss of ∆x, ∆y, and pen states p_1, p_2, and p_3.
-    pen_state_loss = 0
-
-    offset_loss = 0
-
-    ending_index = get_ending_index(labels)
-
-    for i, (predicted_stroke, label_stroke) in enumerate(zip(predictions, labels)):
-        pen_state_loss += log_loss(predicted_stroke[2:], label_stroke[2:])
-
-        if i <= ending_index:
-            offset_loss += log_loss(predicted_stroke[:2], label_stroke[:2])
-
-    return pen_state_loss + offset_loss
-
-
-# training: if len(S) < MAX_STROKES, pad it with (0, 0, 0, 0, 1) until the length equals MAX_SROKES
-
-hyper_parameters = HyperParameters()
-
+print("loading data...", end="\r")
 category = "airplane"
 
-with open("data/processed_airplane.ndjson") as f:
-    drawings = ndjson.load(f)
+load_path = f"data/processed_{category}.npz"
+
+sketches = np.load(load_path, allow_pickle=True, encoding='latin1')["train"]
+
+
+sketches_dataset = SketchesDataset(sketches)
+print("loaded data.   ")
+
+for sketch in sketches_dataset:
+    print(sketch.size())
+    break
+
+model = SketchDecoder(HyperParameters()).to(HyperParameters.DEVICE)
+
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
+
+base_folder_name = f'models/decoder'
+folder_name = get_available_folder_name(base_folder_name)
+os.makedirs(folder_name, exist_ok=True)
+
+print_frequency = 100
+
+for epoch in range(60):
+    for i, data in enumerate(sketches_dataset):
+        label = data.to(HyperParameters.DEVICE)
+
+        optimizer.zero_grad()
+
+        output = model()
+        loss = reconstruction_loss(output, label)
+        loss.backward()
+        optimizer.step()
+
+        if (i + 1) % print_frequency == 0:    # print every [print_frequency] mini-batches
+            print(f'[{epoch + 1}, {i + 1}] loss: {loss.item():.3f}')
+        
+    file_name = f"epoch_{epoch+1}_loss_{loss.item():.4f}"
+
+    torch.save(
+        {
+            "model_class_name": model.__class__.__name__,
+            "hyper_parameters": model.hyper_parameters.state_dict(),
+            "state_dict": model.state_dict(),
+        },
+        f"{folder_name}/{file_name}.pth",
+    )
+        
+print('Finished Training')
