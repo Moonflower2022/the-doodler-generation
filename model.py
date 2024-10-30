@@ -10,11 +10,11 @@ class SketchCell(nn.Module):
         self.linear = nn.Linear(hyper_parameters.HIDDEN_SIZE, 7)
         self.tanh = nn.Tanh()
 
-    def forward(self, x):
-        lstm_output, _ = self.lstm_cell(x)
+    def forward(self, x, hidden_state=None):
+        lstm_output, _ = self.lstm_cell(x, hidden_state)
         linear_output = self.linear(lstm_output)
         logits = self.tanh(linear_output)
-        return logits
+        return logits, hidden_state
 
 class SketchDecoder(nn.Module):
     def __init__(self, hyper_parameters):
@@ -25,9 +25,11 @@ class SketchDecoder(nn.Module):
     def forward(self):
         output = torch.tensor([0, 0, 1, 0, 0], dtype=torch.float32).to(self.hyper_parameters.DEVICE).unsqueeze(0)
 
+        hidden_state = None
+
         i = 0
         while torch.argmax(output[-1][2:]) != torch.tensor(2, device=self.hyper_parameters.DEVICE) and i < self.hyper_parameters.MAX_STROKES:
-            cell_output = self.lstm_cell(output[-1])
+            cell_output, hidden_state = self.lstm_cell(output[-1], hidden_state)
 
             gaussian_params = cell_output[:4]
             softmax_values = cell_output[4:]
