@@ -67,6 +67,7 @@ def train_model():
 
     for epoch in range(60):
         for i, data in enumerate(sketches_dataset):
+            print(epoch, i)
             label = data.to(HyperParameters.DEVICE)
 
             optimizer.zero_grad()

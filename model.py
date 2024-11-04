@@ -23,37 +23,32 @@ class SketchDecoder(nn.Module):
         self.lstm_cell = SketchCell(hyper_parameters)
 
     def forward(self):
-        output = torch.tensor([0, 0, 1, 0, 0], dtype=torch.float32).to(self.hyper_parameters.DEVICE).unsqueeze(0)
+        # Pre-allocate the output tensor
+        output = torch.zeros((self.hyper_parameters.MAX_STROKES + 1, 5), dtype=torch.float32, device=self.hyper_parameters.DEVICE)
+        output[0] = torch.tensor([0, 0, 1, 0, 0], dtype=torch.float32, device=self.hyper_parameters.DEVICE)
 
         hidden_state = None
 
-        i = 0
-        while torch.argmax(output[-1][2:]) != torch.tensor(2, device=self.hyper_parameters.DEVICE) and i < self.hyper_parameters.MAX_STROKES:
-            cell_output, hidden_state = self.lstm_cell(output[-1], hidden_state)
+        for i in range(1, self.hyper_parameters.MAX_STROKES + 1):
+            # Stop condition based on the previous row
+            if torch.argmax(output[i - 1][2:]) == 2:
+                break
 
-            gaussian_params = cell_output[:4]
-            softmax_values = cell_output[4:]
-
+            # LSTM cell and softmax calculation
+            cell_output, hidden_state = self.lstm_cell(output[i - 1], hidden_state)
+            gaussian_params, softmax_values = cell_output[:4], cell_output[4:]
             softmax = torch.softmax(softmax_values, dim=0)
 
+            # Gaussian sampling for x and y
             mu_x, sigma_x = gaussian_params[0], torch.exp(gaussian_params[1] / 2)
             mu_y, sigma_y = gaussian_params[2], torch.exp(gaussian_params[3] / 2)
+            gaussian_sample_x = torch.normal(mu_x, sigma_x)
+            gaussian_sample_y = torch.normal(mu_y, sigma_y)
 
-            gaussian_sample_x = torch.normal(mu_x, sigma_x).to(self.hyper_parameters.DEVICE)
-            gaussian_sample_y = torch.normal(mu_y, sigma_y).to(self.hyper_parameters.DEVICE)
+            # Populate row `i` of the output directly
+            output[i] = torch.tensor([gaussian_sample_x, gaussian_sample_y, *softmax.tolist()], device=self.hyper_parameters.DEVICE, requires_grad=True)
 
-            new_output = torch.cat([torch.tensor([gaussian_sample_x, gaussian_sample_y], device=self.hyper_parameters.DEVICE), softmax])
-            if i > 0:
-                output = torch.cat((output, new_output.unsqueeze(0)), axis=0)
-            i += 1
-        
-        pad_tensor = torch.tensor([0, 0, 0, 0, 1], dtype=torch.float32, device=self.hyper_parameters.DEVICE).unsqueeze(0)
-        padding_needed = self.hyper_parameters.MAX_STROKES - output.size(0)
-        if padding_needed > 0:
-            padding = pad_tensor.repeat(padding_needed, 1)
-            output = torch.cat((output, padding), axis=0)
-
-        return output
+        return output[1:]
 
 if __name__ == '__main__':
     model = SketchDecoder(HyperParameters()).to(HyperParameters.DEVICE)

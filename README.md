@@ -4,8 +4,8 @@ Generation models for the quick, draw! dataset by google that are based on the S
 
 ## todo
 
-* fix forward function of model; it gets stuck half the time
-* optimization
+* make model's forward funciton faster
+* make model perform better
   * think about adding more layers to the lstm
   * scheduler?
   * batching?
