@@ -35,9 +35,8 @@ def reconstruction_loss(prediction, label):
 
 def train_model():
     print("loading data...", end="\r")
-    category = "airplane"
 
-    load_path = f"data/processed_{category}.npz"
+    load_path = f"data/processed_{HyperParameters.DATA_CATEGORY}.npz"
 
     sketches = np.load(load_path, allow_pickle=True, encoding='latin1')["train"]
 
@@ -59,7 +58,7 @@ def train_model():
     with open("models/latest_experiment.txt", "w") as file:
         file.write("")
 
-    base_folder_name = f'models/decoder'
+    base_folder_name = f'models/decoder_{HyperParameters.DATA_CATEGORY}'
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
 
@@ -67,7 +66,6 @@ def train_model():
 
     for epoch in range(60):
         for i, data in enumerate(sketches_dataset):
-            print(epoch, i)
             label = data.to(HyperParameters.DEVICE)
 
             optimizer.zero_grad()
@@ -78,9 +76,9 @@ def train_model():
             optimizer.step()
 
             if (i + 1) % print_frequency == 0:    # print every [print_frequency] mini-batches
-                print(f'[{epoch + 1}, {i + 1}] loss: {loss.item():.3f}')
+                print(f'[{epoch + 1}, {i + 1}] loss: {loss.item():.2f}')
             
-        file_name = f"epoch_{epoch+1}_loss_{loss.item():.4f}"
+        file_name = f"epoch_{epoch+1}_loss_{loss.item():.2f}"
 
         torch.save(
             {

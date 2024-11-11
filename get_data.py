@@ -1,5 +1,5 @@
 from google.cloud import storage
-
+from utils import HyperParameters
 
 def download_quickdraw_ndjson(category, destination_file_name):
     """
@@ -43,5 +43,4 @@ def download_quickdraw_npz(category_file_name, destination_file_name):
 
 
 if __name__ == "__main__":
-    category_file_name = "airplane.full"
-    download_quickdraw_npz(category_file_name, f"data/{category_file_name}.npz")
+    download_quickdraw_npz(HyperParameters.DATA_CATEGORY, f"data/{HyperParameters.DATA_CATEGORY}.npz")

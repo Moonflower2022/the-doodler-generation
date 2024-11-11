@@ -27,8 +27,12 @@ def get_available_folder_name(base_name, directory="."):
 
     return available_name
 
+def get_max_strokes(data):
+    return max([len(sketch) for sketch in data]) + 1
+
 
 class HyperParameters:
+    DATA_CATEGORY = "apple"
     DEVICE = device
     INPUT_SIZE = 5
     # ∆x,
@@ -36,10 +40,11 @@ class HyperParameters:
     # pen down (pen is currently down),
     # pen up (after this stroke, pen goes up),
     # end (current point and subsequent points are voided)
-    HIDDEN_SIZE = 256
+    HIDDEN_SIZE = 512
     BIAS = True
-    MAX_STROKES = 2016
+    MAX_STROKES = 63
     LEARNING_RATE = 1e-5
+    DROP_OUT = 0.9
 
     def state_dict():
         return {
@@ -53,3 +58,11 @@ class HyperParameters:
             # Update the instance attribute if it exists
             if hasattr(self, key):
                 setattr(self, key, value)
+
+if __name__ == '__main__':
+    import numpy as np
+
+    load_path = f"data/{HyperParameters.DATA_CATEGORY}.npz"
+    drawings = np.load(load_path, allow_pickle=True, encoding='latin1')
+
+    print(get_max_strokes(drawings['train']))
