@@ -19,7 +19,10 @@ if __name__ == "__main__":
     outputs = []
 
     for i in range(hyper_parameters.MAX_STROKES):
-        output, hidden_cell = model.generate_stroke(last_stroke=None if i == 0 else outputs[-1], hidden_cell=None if i == 0 else hidden_cell)
+        output, hidden_cell = model.generate_stroke(
+            last_stroke=None if i == 0 else outputs[-1],
+            hidden_cell=None if i == 0 else hidden_cell,
+        )
         if torch.argmax(output[2:]) == 2:
             break
         outputs.append(output)

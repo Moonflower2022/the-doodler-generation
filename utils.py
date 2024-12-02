@@ -27,6 +27,7 @@ def get_available_folder_name(base_name, directory="."):
 
     return available_name
 
+
 def get_max_strokes(data):
     return max([len(sketch) for sketch in data]) + 1
 
@@ -61,10 +62,11 @@ class HyperParameters:
             if hasattr(self, key):
                 setattr(self, key, value)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import numpy as np
 
     load_path = f"data/{HyperParameters.DATA_CATEGORY}.npz"
-    drawings = np.load(load_path, allow_pickle=True, encoding='latin1')
+    drawings = np.load(load_path, allow_pickle=True, encoding="latin1")
 
-    print(get_max_strokes(drawings['train']))
+    print(get_max_strokes(drawings["train"]))

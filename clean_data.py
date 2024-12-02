@@ -88,7 +88,7 @@ def clean_and_output(category):
     drawings = np.load(load_path, allow_pickle=True, encoding="latin1")
     print("loaded object:", drawings.items)
 
-    for sketch in drawings['train']:
+    for sketch in drawings["train"]:
         has_stop = False
         for stroke in to_big_strokes(sketch):
             if stroke[4] == 1:

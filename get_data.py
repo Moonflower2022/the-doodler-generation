@@ -1,6 +1,7 @@
 from google.cloud import storage
 from utils import HyperParameters
 
+
 def download_quickdraw_ndjson(category, destination_file_name):
     """
     Downloads a Quick, Draw! ndjson raw file for a specific category from the public bucket.
@@ -21,6 +22,7 @@ def download_quickdraw_ndjson(category, destination_file_name):
 
     print(f"Downloaded Quick, Draw! data for '{category}' to {destination_file_name}.")
 
+
 def download_quickdraw_npz(category_file_name, destination_file_name):
     """
     Downloads a Quick, Draw! numpy bitmap file for a specific category from the public bucket.
@@ -39,8 +41,12 @@ def download_quickdraw_npz(category_file_name, destination_file_name):
     # Download the file to the specified local path
     blob.download_to_filename(destination_file_name)
 
-    print(f"Downloaded Quick, Draw! data for '{category_file_name}' to {destination_file_name}.")
+    print(
+        f"Downloaded Quick, Draw! data for '{category_file_name}' to {destination_file_name}."
+    )
 
 
 if __name__ == "__main__":
-    download_quickdraw_npz(HyperParameters.DATA_CATEGORY, f"data/{HyperParameters.DATA_CATEGORY}.npz")
+    download_quickdraw_npz(
+        HyperParameters.DATA_CATEGORY, f"data/{HyperParameters.DATA_CATEGORY}.npz"
+    )
