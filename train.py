@@ -1,32 +1,26 @@
 from utils import get_ending_index, get_available_folder_name, HyperParameters
 from clean_data import SketchesDataset
 from model import SketchDecoder
+
+from torch.utils.data import DataLoader
 from torch import nn
 from torch import optim
 import torch
 import numpy as np
+import time
 import os
 
-def reconstruction_loss(prediction, label):
+def reconstruction_loss(predictions, labels):    
+    predicted_pen_states = predictions[:, 2:]
+    label_pen_states = labels[:, 2:]
     
-    # ending_index is the last index up to which offset_loss will be applied.
-    ending_index = get_ending_index(label)
+    predicted_offsets = predictions[:, :2]
+    label_offsets = labels[:, :2]
     
-    # Separate pen states and offsets for predictions and labels
-    pred_pen_states = prediction[:, 2:]
-    label_pen_states = label[:, 2:]
+    pen_state_loss = torch.nn.functional.binary_cross_entropy(predicted_pen_states, label_pen_states)
+    offset_loss = torch.nn.functional.binary_cross_entropy(predicted_offsets, label_offsets)
     
-    pred_offsets = prediction[:, :2]
-    label_offsets = label[:, :2]
-    
-    # Calculate pen state loss
-    pen_state_loss = torch.nn.functional.binary_cross_entropy(pred_pen_states, label_pen_states, reduction='sum')
-    
-    # Apply mask for offset loss
-    mask = torch.arange(label.size(0), device=label.device) <= ending_index
-    offset_loss = torch.nn.functional.binary_cross_entropy(pred_offsets[mask], label_offsets[mask], reduction='sum')
-    
-    # Average loss over MAX_STROKES for normalization
+    # average loss over MAX_STROKES
     total_loss = -(pen_state_loss + offset_loss) / HyperParameters.MAX_STROKES
     
     return total_loss
@@ -42,21 +36,16 @@ def train_model():
 
 
     sketches_dataset = SketchesDataset(sketches)
+    sketches_data_loader = DataLoader(sketches_dataset, batch_size=HyperParameters.BATCH_SIZE)
+
     print("loaded data.   ")
 
-    for sketch in sketches_dataset:
-        print(sketch.size())
+    for batch in sketches_data_loader:
+        print("input batch size:", batch.size())
         break
 
     model = SketchDecoder(HyperParameters()).to(HyperParameters.DEVICE)
-
-    for param in model.parameters():
-        param.requires_grad = True
-
     optimizer = optim.Adam(model.parameters(), lr=HyperParameters.LEARNING_RATE)
-
-    with open("models/latest_experiment.txt", "w") as file:
-        file.write("")
 
     base_folder_name = f'models/decoder_{HyperParameters.DATA_CATEGORY}'
     folder_name = get_available_folder_name(base_folder_name)
@@ -64,14 +53,16 @@ def train_model():
 
     print_frequency = 100
 
-    for epoch in range(60):
-        for i, data in enumerate(sketches_dataset):
-            label = data.to(HyperParameters.DEVICE)
+    start_time = time.time()
+
+    for epoch in range(1000):
+        for i, batch in enumerate(sketches_data_loader):
+            label = batch.to(HyperParameters.DEVICE)
 
             optimizer.zero_grad()
 
-            output = model()
-            loss = reconstruction_loss(output, label)
+            output, _ = model()
+            loss = reconstruction_loss(output, label[:, 0, :])
             loss.backward()
             optimizer.step()
 
@@ -91,7 +82,7 @@ def train_model():
         with open("models/latest_experiment.txt", "w") as file:
             file.write(f"{folder_name}/{file_name}.pth")
             
-    print('Finished Training')
+    print(f'Finished Training, spent {time.time() - start_time}s')
 
 if __name__ == '__main__':
     train_model()
