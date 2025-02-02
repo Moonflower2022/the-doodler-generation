@@ -33,7 +33,7 @@ def get_max_strokes(data):
 
 
 class HyperParameters:
-    DATA_CATEGORY = "apple"
+    DATA_CATEGORY = "sock"
     DEVICE = device
     INPUT_SIZE = 5
     # ∆x,
@@ -43,10 +43,10 @@ class HyperParameters:
     # end (current point and subsequent points are voided)
     HIDDEN_SIZE = 512
     BIAS = True
-    MAX_STROKES = 63
-    LEARNING_RATE = 1e-5
+    MAX_STROKES = 66
+    LEARNING_RATE = 1e-3
     BATCH_SIZE = 100
-    DROPOUT = 0.9
+    DROPOUT = 0.1
     LATENT_VECTOR_SIZE = 128
 
     def state_dict():

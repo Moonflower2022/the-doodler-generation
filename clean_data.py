@@ -3,7 +3,7 @@ from utils import HyperParameters, get_max_strokes
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
 import torch
-
+import random
 
 class SketchesDataset(Dataset):
     def __init__(self, sketches):
@@ -56,6 +56,8 @@ def draw_sketch(stroke_data):
     # Adjust the aspect ratio
     ax.set_aspect("equal")
 
+    plt.gca().invert_yaxis()
+
     # Turn off the axes
     plt.axis("off")
 
@@ -105,7 +107,7 @@ def clean_and_output(category):
         for data_section in ["train", "test", "valid"]
     }
 
-    draw_sketch(output["train"][100])
+    draw_sketch(random.choice(output["train"]))
 
     file_path = f"data/processed_{category}.npz"
 

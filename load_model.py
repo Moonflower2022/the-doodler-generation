@@ -29,5 +29,5 @@ if __name__ == "__main__":
 
     torchized_outputs = torch.stack(outputs, dim=1).T
     print(torchized_outputs.size())
-    print(torchized_outputs[0])
+    print(torchized_outputs)
     draw_sketch(torchized_outputs.detach().numpy())

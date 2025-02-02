@@ -1,1 +1,1 @@
-models/decoder_apple_3/epoch_1000_loss_2.29.pth
+models/decoder_sock_5/epoch_3420_loss_-16.76.pth

@@ -56,11 +56,14 @@ def train_model():
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
 
-    print_frequency = 100
+    print_frequency = 1
+    save_frequency = 100
 
     start_time = time.time()
 
-    for epoch in range(1000):
+    num_epochs = 5000
+
+    for epoch in range(num_epochs):
         for i, batch in enumerate(sketches_data_loader):
             label = batch.to(HyperParameters.DEVICE)
 
@@ -70,26 +73,25 @@ def train_model():
             loss = reconstruction_loss(output, label[:, 0, :])
             loss.backward()
             optimizer.step()
+        
+        if (epoch + 1) % print_frequency == 0:
+            print(f"[Epoch {epoch + 1}] loss: {loss.item():.2f}")
 
-            if (
-                i + 1
-            ) % print_frequency == 0:  # print every [print_frequency] mini-batches
-                print(f"[{epoch + 1}, {i + 1}] loss: {loss.item():.2f}")
+        if (epoch + 1) % save_frequency == 0:
+            file_name = f"epoch_{epoch+1}_loss_{loss.item():.2f}"
 
-        file_name = f"epoch_{epoch+1}_loss_{loss.item():.2f}"
+            torch.save(
+                {
+                    "model_class_name": model.__class__.__name__,
+                    "hyper_parameters": HyperParameters.state_dict(),
+                    "state_dict": model.state_dict(),
+                },
+                f"{folder_name}/{file_name}.pth",
+            )
+            with open("models/latest_experiment.txt", "w") as file:
+                file.write(f"{folder_name}/{file_name}.pth")
 
-        torch.save(
-            {
-                "model_class_name": model.__class__.__name__,
-                "hyper_parameters": HyperParameters.state_dict(),
-                "state_dict": model.state_dict(),
-            },
-            f"{folder_name}/{file_name}.pth",
-        )
-        with open("models/latest_experiment.txt", "w") as file:
-            file.write(f"{folder_name}/{file_name}.pth")
-
-    print(f"Finished Training, spent {time.time() - start_time}s")
+    print(f"Finished Training, spent {time.time() - start_time}s running {num_epochs} epochs")
 
 
 if __name__ == "__main__":

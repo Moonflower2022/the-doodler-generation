@@ -4,9 +4,4 @@ Generation models for the quick, draw! dataset by google that are based on the S
 
 ## todo
 
-* make model's forward funciton faster
-* make model perform better
-  * think about adding more layers to the lstm
-  * scheduler?
-  * batching?
-  * learning rate?
+* something is wrong with the model
