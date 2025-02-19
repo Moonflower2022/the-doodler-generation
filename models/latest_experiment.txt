@@ -1,1 +1,1 @@
-models/decoder_sock_5/epoch_3420_loss_-16.76.pth
+models/decoder_sock_27/epoch_1900_loss_13.51.pth

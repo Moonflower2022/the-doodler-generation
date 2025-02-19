@@ -7,7 +7,7 @@ if __name__ == "__main__":
     with open("models/latest_experiment.txt", "r") as file:
         model_path = file.read()
 
-    info = torch.load(model_path)
+    info = torch.load(model_path, weights_only=False)
 
     hyper_parameters = HyperParameters()
     hyper_parameters.input_state(info["hyper_parameters"])
