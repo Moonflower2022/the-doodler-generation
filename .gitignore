@@ -163,5 +163,6 @@ cython_debug/
 
 data
 models
+**/latest_experiment.txt/**
 
 .DS_Store

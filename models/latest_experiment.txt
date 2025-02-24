@@ -1,1 +1,0 @@
-models/decoder_sock_27/epoch_1900_loss_13.51.pth

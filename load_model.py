@@ -23,9 +23,9 @@ if __name__ == "__main__":
             last_stroke=None if i == 0 else outputs[-1],
             hidden_cell=None if i == 0 else hidden_cell,
         )
+        outputs.append(output)
         if torch.argmax(output[2:]) == 2:
             break
-        outputs.append(output)
 
     torchized_outputs = torch.stack(outputs, dim=1).T
     print(torchized_outputs.size())

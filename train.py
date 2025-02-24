@@ -9,7 +9,7 @@ import torch
 import numpy as np
 import time
 import os
-
+import logging
 
 def log_normal_pdf(mu, sigma, x):
     return -0.5 * (
@@ -20,44 +20,56 @@ def log_normal_pdf(mu, sigma, x):
 
 
 def reconstruction_loss(predictions, labels):
-    predicted_offset_distributions = predictions[:, :4]
-    label_offsets = labels[:, :2]
+    predicted_offset_distributions = predictions[:, :, :4]
+    label_offsets = labels[:, :, :2]
 
-    predicted_pen_states = predictions[:, 4:]
-    label_pen_states = labels[:, 2:]
+    predicted_pen_states = predictions[:, :, 4:]
+    label_pen_states = labels[:, :, 2:]
 
-    # Find where [0,0,0,0,1] occurs - looking for the first occurrence of pen_state[4] == 1
-    end_mask = label_pen_states[:, 2] == 1  # Find where fifth state is 1
-    end_indices = torch.where(end_mask)[0]  # Get indices where True
+    end_mask = label_pen_states[:, :, 2] == 1
 
-    if len(end_indices) > 0:
-        N_s = end_indices[0]  # Take first occurrence
-    else:
-        N_s = len(labels)  # If no end token, use full sequence
+    batch_size = labels.size(0)
+    N_s = torch.zeros(batch_size, dtype=torch.long, device=labels.device)
 
-    offset_loss = -torch.sum(
-        log_normal_pdf(
-            predicted_offset_distributions[:N_s, 0],
-            predicted_offset_distributions[:N_s, 1],
-            label_offsets[:N_s, 0],
+    # find where the sketches stop
+    for b in range(batch_size):
+        end_indices = torch.where(end_mask[b])[0]
+        if len(end_indices) > 0:
+            N_s[b] = end_indices[0]
+        else:
+            N_s[b] = len(labels[b])
+
+    offset_loss = torch.zeros(1, device=labels.device)
+    pen_state_loss = torch.zeros(1, device=labels.device)
+
+    for b in range(batch_size):
+        offset_loss += -torch.sum(
+            log_normal_pdf(
+                predicted_offset_distributions[b, : N_s[b], 0],
+                predicted_offset_distributions[b, : N_s[b], 1],
+                label_offsets[b, : N_s[b], 0],
+            )
+            + log_normal_pdf(
+                predicted_offset_distributions[b, : N_s[b], 2],
+                predicted_offset_distributions[b, : N_s[b], 3],
+                label_offsets[b, : N_s[b], 1],
+            )
         )
-        + log_normal_pdf(
-            predicted_offset_distributions[:N_s, 2],
-            predicted_offset_distributions[:N_s, 3],
-            label_offsets[:N_s, 1],
-        )
+
+        logits = nn.functional.softmax(predicted_pen_states[b], dim=1)
+        pen_state_loss += -torch.sum(label_pen_states[b] * torch.log(logits))
+
+    total_loss = (pen_state_loss + offset_loss) / (
+        batch_size * HyperParameters.MAX_STROKES
     )
-
-    pen_state_loss = -torch.sum(label_pen_states * torch.log(predicted_pen_states))
-
-    # average loss over MAX_STROKES
-    total_loss = (pen_state_loss + offset_loss) / HyperParameters.MAX_STROKES
-
     return total_loss
 
 
 def train_model():
-    print("loading data...", end="\r")
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(filename='train.log', encoding='utf-8', level=logging.DEBUG)
+
+    print("loading data:", end="\r")
 
     load_path = f"data/processed_{HyperParameters.DATA_CATEGORY}.npz"
 
@@ -76,67 +88,62 @@ def train_model():
 
     model = SketchDecoder(HyperParameters()).to(HyperParameters.DEVICE)
     optimizer = optim.Adam(model.parameters(), lr=HyperParameters.LEARNING_RATE)
-    # scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=HyperParameters.LEARNING_RATE_DECAY)
+    scheduler = optim.lr_scheduler.ExponentialLR(
+        optimizer, gamma=HyperParameters.LEARNING_RATE_DECAY
+    )
 
     base_folder_name = f"models/decoder_{HyperParameters.DATA_CATEGORY}"
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
 
     print_frequency = 1
-    save_frequency = 100
+    save_frequency = 1
+    log_frequency = 1
 
     start_time = time.time()
 
     num_epochs = 5000
 
     for epoch in range(num_epochs):
-        epoch_loss = 0
-        num_batches = 0
-        
-        for batch in sketches_data_loader:
-            batch = batch.to(HyperParameters.DEVICE)
-            
-            optimizer.zero_grad()
-            
-            # Get model predictions (PDF parameters and pen states)
-            predictions, hidden_cell = model()
-            
-            # Get target
-            target = batch[:, 0, :]  # First timestep as target
-            
-            # Compute loss using the PDF parameters
-            loss = reconstruction_loss(predictions, target)
-            loss.backward()
-            
-            # Gradient clipping for stability
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            
-            optimizer.step()
-            # scheduler.step()
+        for i, sketch_batch in enumerate(sketches_data_loader):
+            sketch_batch = sketch_batch.to(HyperParameters.DEVICE)
 
-            # # Clamp learning rate if it goes below min_lr
-            # for param_group in optimizer.param_groups:
-            #     if param_group['lr'] < HyperParameters.MIN_LEARNING_RATE:
-            #         param_group['lr'] = HyperParameters.MIN_LEARNING_RATE
-            
-            epoch_loss += loss.item()
-            num_batches += 1
-        
-        avg_epoch_loss = epoch_loss / num_batches
-        
+            optimizer.zero_grad()
+
+            outputs, _ = model(sketch_batch)
+            loss = reconstruction_loss(outputs, sketch_batch)
+
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+
+            for param_group in optimizer.param_groups:
+                if param_group["lr"] < HyperParameters.MIN_LEARNING_RATE:
+                    param_group["lr"] = HyperParameters.MIN_LEARNING_RATE
+
         if (epoch + 1) % print_frequency == 0:
-            print(f"[Epoch {epoch + 1}] loss: {avg_epoch_loss:.2f}")
-            
+            print(f"[Epoch {epoch + 1}] loss: {loss.item():.2f}")
+
+        if (epoch + 1) % log_frequency == 0:
+            logger.info(f"inputs[0]: {sketch_batch[0]}")
+            logger.info(f"outputs[0]: {outputs[0]}")
+            logger.info(f"loss: {loss.item():.2f}")
+            logger.info(f"learning rate: {optimizer.param_groups[0]["lr"]}")
+
         if (epoch + 1) % save_frequency == 0:
+            save_filename = f"{folder_name}/epoch_{epoch+1}_loss_{loss.item():.2f}.pth"
             torch.save(
                 {
                     "model_class_name": model.__class__.__name__,
                     "hyper_parameters": HyperParameters.state_dict(),
                     "state_dict": model.state_dict(),
                 },
-                f"models/decoder_{HyperParameters.DATA_CATEGORY}/epoch_{epoch+1}_loss_{avg_epoch_loss:.2f}.pth",
+                save_filename
             )
+            with open("models/latest_experiment.txt", "w") as output_file:
+                output_file.write(save_filename)
     print(f"finished training in {start_time - time.time()}s")
+
 
 if __name__ == "__main__":
     train_model()
