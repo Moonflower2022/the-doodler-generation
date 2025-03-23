@@ -2,7 +2,6 @@ import torch
 from utils import HyperParameters
 from torch import nn
 
-
 class SketchDecoder(nn.Module):
     def __init__(self, hyper_parameters):
         super(SketchDecoder, self).__init__()
@@ -67,7 +66,7 @@ class SketchDecoder(nn.Module):
             stroke_parameters[:, :, 4:],
         )
 
-        pen_state_probabilities = torch.softmax(pen_state_logits, dim=0)
+        pen_state_probabilities = torch.softmax(pen_state_logits, dim=-1)
 
         mu_x, sigma_x = gaussian_parameters[:, :, 0], torch.exp(
             gaussian_parameters[:, :, 1] / 2
@@ -114,7 +113,7 @@ class SketchDecoder(nn.Module):
             stroke_parameters[:4],
             stroke_parameters[4:],
         )
-        pen_state_probabilities = torch.softmax(pen_state_logits, dim=0)
+        pen_state_probabilities = torch.softmax(pen_state_logits, dim=-1)
 
         # gaussian sampling for ∆x and ∆y
         mu_x, sigma_x = gaussian_parameters[0], torch.exp(gaussian_parameters[1] / 2)

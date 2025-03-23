@@ -1,4 +1,4 @@
-from utils import get_ending_index, get_available_folder_name, HyperParameters
+from utils import get_available_folder_name, get_logger, HyperParameters
 from clean_data import SketchesDataset
 from model import SketchDecoder
 
@@ -9,7 +9,6 @@ import torch
 import numpy as np
 import time
 import os
-import logging
 
 def log_normal_pdf(mu, sigma, x):
     return -0.5 * (
@@ -66,9 +65,6 @@ def reconstruction_loss(predictions, labels):
 
 
 def train_model():
-    logger = logging.getLogger(__name__)
-    logging.basicConfig(filename='train.log', encoding='utf-8', level=logging.DEBUG)
-
     print("loading data:", end="\r")
 
     load_path = f"data/processed_{HyperParameters.DATA_CATEGORY}.npz"
@@ -95,6 +91,9 @@ def train_model():
     base_folder_name = f"models/decoder_{HyperParameters.DATA_CATEGORY}"
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
+
+    logger = get_logger(__name__, f"{folder_name}/train.log")
+    io_logger = get_logger(__name__, f"{folder_name}/input_output.log")
 
     print_frequency = 1
     save_frequency = 1
@@ -125,10 +124,12 @@ def train_model():
             print(f"[Epoch {epoch + 1}] loss: {loss.item():.2f}")
 
         if (epoch + 1) % log_frequency == 0:
-            logger.info(f"inputs[0]: {sketch_batch[0]}")
-            logger.info(f"outputs[0]: {outputs[0]}")
+            io_logger.info(f"inputs[0]: {sketch_batch[0]}")
+            io_logger.info(f"outputs[0]: {outputs[0]}")
+            logger.info(f"EPOCH {epoch}")
             logger.info(f"loss: {loss.item():.2f}")
             logger.info(f"learning rate: {optimizer.param_groups[0]["lr"]}")
+            logger.info(f"training time so far: {time.time() - start_time}s")
 
         if (epoch + 1) % save_frequency == 0:
             save_filename = f"{folder_name}/epoch_{epoch+1}_loss_{loss.item():.2f}.pth"
@@ -142,7 +143,6 @@ def train_model():
             )
             with open("models/latest_experiment.txt", "w") as output_file:
                 output_file.write(save_filename)
-    print(f"finished training in {start_time - time.time()}s")
 
 
 if __name__ == "__main__":

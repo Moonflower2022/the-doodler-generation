@@ -1,5 +1,6 @@
 import torch
 import os
+import logging
 
 device = (
     "cuda"
@@ -33,7 +34,7 @@ def get_max_strokes(data):
 
 
 class HyperParameters:
-    DATA_CATEGORY = "sock"
+    DATA_CATEGORY = "apple"
     DEVICE = device
     INPUT_SIZE = 5
     # ∆x,
@@ -43,9 +44,9 @@ class HyperParameters:
     # end (current point and subsequent points are voided)
     HIDDEN_SIZE = 512
     BIAS = True
-    MAX_STROKES = 66
+    MAX_STROKES = 63
     LEARNING_RATE = 1e-3
-    LEARNING_RATE_DECAY = 0.9999
+    LEARNING_RATE_DECAY = 1 # 0.9999
     MIN_LEARNING_RATE = 0.00001
     BATCH_SIZE = 100
     DROPOUT = 0.9
@@ -64,6 +65,18 @@ class HyperParameters:
             if hasattr(self, key):
                 setattr(self, key, value)
 
+
+LOG_FORMAT = "%(asctime)s [%(levelname)s]: %(message)s in %(pathname)s:%(lineno)d"
+formatter = logging.Formatter(LOG_FORMAT)
+
+def get_logger(name, log_file, level=logging.WARNING):
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    handler = logging.FileHandler(filename=log_file) 
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    return logger
 
 if __name__ == "__main__":
     import numpy as np
