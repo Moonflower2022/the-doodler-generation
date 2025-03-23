@@ -92,8 +92,11 @@ def train_model():
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
 
-    logger = get_logger(__name__, f"{folder_name}/train.log")
-    io_logger = get_logger(__name__, f"{folder_name}/input_output.log")
+    logger = get_logger(f"{__name__}.info", f"{folder_name}/train.log")
+    io_logger = get_logger(f"{__name__}.io", f"{folder_name}/input_output.log")
+
+    logger.info("Training started")
+    io_logger.info("IO logging initialized")
 
     print_frequency = 1
     save_frequency = 1
@@ -114,8 +117,7 @@ def train_model():
 
             loss.backward()
             optimizer.step()
-            scheduler.step()
-
+            
             for param_group in optimizer.param_groups:
                 if param_group["lr"] < HyperParameters.MIN_LEARNING_RATE:
                     param_group["lr"] = HyperParameters.MIN_LEARNING_RATE
@@ -143,6 +145,8 @@ def train_model():
             )
             with open("models/latest_experiment.txt", "w") as output_file:
                 output_file.write(save_filename)
+
+        scheduler.step()
 
 
 if __name__ == "__main__":

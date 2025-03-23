@@ -48,7 +48,7 @@ class HyperParameters:
     LEARNING_RATE = 1e-3
     LEARNING_RATE_DECAY = 1 # 0.9999
     MIN_LEARNING_RATE = 0.00001
-    BATCH_SIZE = 100
+    BATCH_SIZE = 200
     DROPOUT = 0.9
     LATENT_VECTOR_SIZE = 128
 
@@ -66,10 +66,10 @@ class HyperParameters:
                 setattr(self, key, value)
 
 
-LOG_FORMAT = "%(asctime)s [%(levelname)s]: %(message)s in %(pathname)s:%(lineno)d"
+LOG_FORMAT = "%(asctime)s [%(levelname)s] (%(filename)s:%(lineno)d): %(message)s"
 formatter = logging.Formatter(LOG_FORMAT)
 
-def get_logger(name, log_file, level=logging.WARNING):
+def get_logger(name, log_file, level=logging.INFO):
     logger = logging.getLogger(name)
     logger.setLevel(level)
     handler = logging.FileHandler(filename=log_file) 
