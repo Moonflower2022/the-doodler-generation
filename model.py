@@ -2,37 +2,6 @@ import torch
 from utils import HyperParameters
 from torch import nn
 
-# def lstm_orthogonal_init(lstm_layer, gain=1.0):
-#     """
-#     Initializes LSTM layer weights using orthogonal initialization.
-
-#     Args:
-#         lstm_layer: torch.nn.LSTM layer
-#         gain: scaling factor for the weights
-#     """
-#     with torch.no_grad():
-#         for name, param in lstm_layer.named_parameters():
-#             if 'weight_ih' in name:  # Input-to-hidden weights
-#                 for idx in range(4):
-#                     # Initialize each gate's weights separately
-#                     nn.init.orthogonal_(
-#                         param.data[idx*lstm_layer.hidden_size:(idx+1)*lstm_layer.hidden_size],
-#                         gain=gain
-#                     )
-
-#             elif 'weight_hh' in name:  # Hidden-to-hidden weights
-#                 for idx in range(4):
-#                     # Initialize each gate's weights separately
-#                     nn.init.orthogonal_(
-#                         param.data[idx*lstm_layer.hidden_size:(idx+1)*lstm_layer.hidden_size],
-#                         gain=gain
-#                     )
-
-#             elif 'bias' in name:
-#                 param.data.fill_(0)
-#                 # Set forget gate bias to 1
-#                 param.data[lstm_layer.hidden_size:2*lstm_layer.hidden_size].fill_(1)
-
 
 class SketchDecoder(nn.Module):
     def __init__(self, hyper_parameters):
@@ -44,7 +13,6 @@ class SketchDecoder(nn.Module):
         )
 
         self.lstm = nn.LSTM(5, hidden_size=hyper_parameters.HIDDEN_SIZE)
-        # lstm_orthogonal_init(self.lstm)
         self.dropout = nn.Dropout(hyper_parameters.DROPOUT)
         # input of lstm should be hyper_parameters.LATENT_VECTOR_SIZE + 5 if using encoder
         self.linear = nn.Linear(hyper_parameters.HIDDEN_SIZE, 7)
