@@ -10,8 +10,9 @@ import numpy as np
 import time
 import os
 
-log_2pi = torch.log(torch.tensor(2 * torch.pi))
+torch.backends.cudnn.benchmark = True
 
+log_2pi = torch.log(torch.tensor(2 * torch.pi))
 
 def log_normal_pdf(mu, sigma, x):
     return -0.5 * (
@@ -26,19 +27,29 @@ def vectorized_reconstruction_loss(predictions, labels):
     predicted_pen_states = predictions[:, :, 4:]
     label_pen_states = labels[:, :, 2:]
     
-    end_mask = label_pen_states[:, :, 2] == 1
     batch_size = labels.size(0)
+    seq_length = labels.size(1)
+    device = labels.device
     
-    # Create a mask for valid points
-    N_s = torch.zeros(batch_size, dtype=torch.long, device=labels.device)
-    for b in range(batch_size):
-        end_indices = torch.where(end_mask[b])[0]
-        N_s[b] = end_indices[0] if len(end_indices) > 0 else len(labels[b])
+    # Vectorized mask creation for valid points
+    end_mask = label_pen_states[:, :, 2] == 1
     
-    # Create a mask matrix for valid points
-    valid_mask = torch.zeros((batch_size, labels.size(1)), dtype=torch.bool, device=labels.device)
-    for b in range(batch_size):
-        valid_mask[b, :N_s[b]] = True
+    # Create indices tensor for each sequence position
+    position_indices = torch.arange(seq_length, device=device).unsqueeze(0).expand(batch_size, -1)
+    
+    # Find the first occurrence of end_mask for each batch
+    # If no end marker, use the max sequence length
+    has_end = torch.any(end_mask, dim=1)
+    first_end_indices = torch.argmax(end_mask.long(), dim=1)
+    # For sequences without end marker, set to seq_length
+    first_end_indices = torch.where(
+        has_end,
+        first_end_indices,
+        torch.tensor(seq_length, device=device).expand(batch_size)
+    )
+    
+    # Create valid mask: positions less than the first end index
+    valid_mask = position_indices < first_end_indices.unsqueeze(1)
     
     # Vectorized computation of offset losses
     x_log_probs = log_normal_pdf(
@@ -53,14 +64,14 @@ def vectorized_reconstruction_loss(predictions, labels):
         label_offsets[:, :, 1]
     )
     
-    offset_loss = -torch.sum((x_log_probs + y_log_probs) * valid_mask)
+    offset_loss = -torch.sum(x_log_probs + y_log_probs)
     
     # Vectorized pen state loss
-    pen_state_loss = 0
-    for b in range(batch_size):
-        # Apply softmax along the correct dimension for each batch element
-        logits = nn.functional.softmax(predicted_pen_states[b, :N_s[b]], dim=1)
-        pen_state_loss -= torch.sum(label_pen_states[b, :N_s[b]] * torch.log(logits + 1e-8))
+    # Apply softmax along the pen state dimension
+    logits = nn.functional.softmax(predicted_pen_states, dim=2)
+    
+    # Calculate cross entropy loss with mask
+    pen_state_loss = -torch.sum(label_pen_states * torch.log(logits + 1e-8) * valid_mask.unsqueeze(2))
     
     total_loss = (pen_state_loss + offset_loss) / (batch_size * HyperParameters.MAX_STROKES)
     return total_loss

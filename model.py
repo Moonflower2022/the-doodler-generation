@@ -7,12 +7,8 @@ class SketchDecoder(nn.Module):
         super(SketchDecoder, self).__init__()
         self.hyper_parameters = hyper_parameters
 
-        self.hidden_initiation_linear = nn.Linear(
-            hyper_parameters.LATENT_VECTOR_SIZE, 2 * hyper_parameters.HIDDEN_SIZE
-        )
-
         self.lstm = nn.LSTM(5, hidden_size=hyper_parameters.HIDDEN_SIZE)
-        self.dropout = nn.Dropout(hyper_parameters.DROPOUT)
+        # self.dropout = nn.Dropout(hyper_parameters.DROPOUT)
         # input of lstm should be hyper_parameters.LATENT_VECTOR_SIZE + 5 if using encoder
         self.linear = nn.Linear(hyper_parameters.HIDDEN_SIZE, 7)
         # current output: first 4 are normal distribution parameters for ∆x and ∆y
@@ -57,7 +53,7 @@ class SketchDecoder(nn.Module):
             hidden_cell = (hidden, cell)
 
         lstm_outputs, hidden_cell = self.lstm(inputs, hidden_cell)
-        lstm_outputs = self.dropout(lstm_outputs)
+        # lstm_outputs = self.dropout(lstm_outputs)
 
         stroke_parameters = self.linear(lstm_outputs)
 
@@ -104,7 +100,7 @@ class SketchDecoder(nn.Module):
             hidden_cell = (hidden, cell)
 
         lstm_outputs, hidden_cell = self.lstm(last_stroke.unsqueeze(0), hidden_cell)
-        lstm_outputs = self.dropout(lstm_outputs)
+        # lstm_outputs = self.dropout(lstm_outputs)
 
         stroke_parameters = self.linear(lstm_outputs[-1])
         # size (7)
