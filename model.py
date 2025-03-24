@@ -1,6 +1,21 @@
 import torch
 from utils import HyperParameters
 from torch import nn
+import numpy as np
+
+def sample_bivariate_normal(sigma_x,sigma_y,rho_xy,mu_x,mu_y):
+    mean = torch.tensor([mu_x, mu_y])
+    covariance_matrix = torch.tensor([
+        [sigma_x * sigma_x, rho_xy * sigma_x * sigma_y],
+        [rho_xy * sigma_x * sigma_y, sigma_y * sigma_y]
+    ])
+
+    mvn = torch.distributions.MultivariateNormal(mean, covariance_matrix)
+    
+    # Sample from the distribution
+    samples = mvn.sample((1,))
+    
+    return samples[0]
 
 class SketchDecoder(nn.Module):
     def __init__(self, hyper_parameters):
@@ -10,7 +25,7 @@ class SketchDecoder(nn.Module):
         self.lstm = nn.LSTM(5, hidden_size=hyper_parameters.HIDDEN_SIZE)
         # self.dropout = nn.Dropout(hyper_parameters.DROPOUT)
         # input of lstm should be hyper_parameters.LATENT_VECTOR_SIZE + 5 if using encoder
-        self.linear = nn.Linear(hyper_parameters.HIDDEN_SIZE, 7)
+        self.linear = nn.Linear(hyper_parameters.HIDDEN_SIZE, 3 + 6 * hyper_parameters.NUM_MIXTURES)
         # current output: first 4 are normal distribution parameters for ∆x and ∆y
         # last 3 are softmax logits for the three pen states
         # output size should be different if using Gausian Mixture Model
@@ -57,27 +72,15 @@ class SketchDecoder(nn.Module):
 
         stroke_parameters = self.linear(lstm_outputs)
 
-        gaussian_parameters, pen_state_logits = (
-            stroke_parameters[:, :, :4],
-            stroke_parameters[:, :, 4:],
-        )
+        m = self.hyper_parameters.NUM_MIXTURES
 
-        pen_state_probabilities = torch.softmax(pen_state_logits, dim=-1)
+        stroke_parameters[:, :, :m] = torch.softmax(stroke_parameters[:, :, :m], dim=-1)        # pi_m
+        stroke_parameters[:, :, m:3 * m] = torch.exp(stroke_parameters[:, :, m:3 * m])          # sigma_x, sigma_y
+        stroke_parameters[:, :, 3 * m:4 * m] = torch.tanh(stroke_parameters[:, :, 3 * m:4 * m]) # rho_xy
+                                                                                                # mu_x, mu_y
+        stroke_parameters[:, :, 6 * m:] = torch.softmax(stroke_parameters[:, :, 6 * m:], dim=-1)# p1, p2, p3
 
-        mu_x, sigma_x = gaussian_parameters[:, :, 0], torch.exp(
-            gaussian_parameters[:, :, 1] / 2
-        )
-        mu_y, sigma_y = gaussian_parameters[:, :, 2], torch.exp(
-            gaussian_parameters[:, :, 3] / 2
-        )
-
-        output = torch.stack(
-            [mu_x, sigma_x, mu_y, sigma_y],
-            dim=-1,  # [HyperParameters.BATCH_SIZE, HyperParameters.MAX_STROKES, 4]
-        )
-        output = torch.cat([output, pen_state_probabilities], dim=-1)
-
-        return (output, hidden_cell)
+        return (stroke_parameters, hidden_cell)
 
     def generate_stroke(self, last_stroke=None, hidden_cell=None):
         if last_stroke == None:
@@ -106,20 +109,32 @@ class SketchDecoder(nn.Module):
         # size (7)
 
         gaussian_parameters, pen_state_logits = (
-            stroke_parameters[:4],
-            stroke_parameters[4:],
+            stroke_parameters[:-3],
+            stroke_parameters[-3:],
         )
+
+        m = self.hyper_parameters.NUM_MIXTURES
+
+        gaussian_parameters[:m] = torch.softmax(gaussian_parameters[:m], dim=-1)        # pi_m
+        gaussian_parameters[m:3 * m] = torch.exp(gaussian_parameters[m:3 * m])          # sigma_x, sigma_y
+        gaussian_parameters[3 * m:4 * m] = torch.tanh(gaussian_parameters[3 * m:4 * m]) # rho_xy
+                                                                                        # mu_x, mu_y
         pen_state_probabilities = torch.softmax(pen_state_logits, dim=-1)
 
-        # gaussian sampling for ∆x and ∆y
-        mu_x, sigma_x = gaussian_parameters[0], torch.exp(gaussian_parameters[1] / 2)
-        mu_y, sigma_y = gaussian_parameters[2], torch.exp(gaussian_parameters[3] / 2)
-        gaussian_sample_x = torch.normal(mu_x, sigma_x).unsqueeze(0)
-        gaussian_sample_y = torch.normal(mu_y, sigma_y).unsqueeze(0)
+        index = torch.multinomial(gaussian_parameters[:m], num_samples=1)[0]
+
+        sample_parameters = []
+
+        for i in range(5):
+            sample_parameters.append(gaussian_parameters[m * (i + 1) + index])
+
+        x, y = sample_bivariate_normal(*sample_parameters)
+
+        print(x, y, pen_state_probabilities)
 
         return (
             torch.cat(
-                [gaussian_sample_x, gaussian_sample_y, pen_state_probabilities]
+                [x.view(-1), y.view(-1), pen_state_probabilities]
             ).to(self.hyper_parameters.DEVICE),
             hidden_cell,
         )

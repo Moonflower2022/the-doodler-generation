@@ -14,29 +14,34 @@ torch.backends.cudnn.benchmark = True
 
 log_2pi = torch.log(torch.tensor(2 * torch.pi))
 
-def log_normal_pdf(mu, sigma, x):
-    return -0.5 * (
-        log_2pi
-        + 2 * torch.log(sigma)
-        + torch.pow(x - mu, 2) / torch.pow(sigma, 2)
-    )
+
+def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy):
+    z_x = ((dx-mu_x)/sigma_x)**2
+    z_y = ((dy-mu_y)/sigma_y)**2
+    z_xy = (dx-mu_x)*(dy-mu_y)/(sigma_x*sigma_y)
+    z = z_x + z_y - 2*rho_xy*z_xy
+    exp = torch.exp(-z/(2*(1-rho_xy**2)))
+    norm = 2*np.pi*sigma_x*sigma_y*torch.sqrt(1-rho_xy**2)
+    return exp/norm
+
 
 def vectorized_reconstruction_loss(predictions, labels):
-    predicted_offset_distributions = predictions[:, :, :4]
+    predicted_offset_parameters = predictions[:, :, :-3]
     label_offsets = labels[:, :, :2]
-    predicted_pen_states = predictions[:, :, 4:]
+    predicted_pen_states = predictions[:, :, -3:]
     label_pen_states = labels[:, :, 2:]
-    
+
     batch_size = labels.size(0)
     seq_length = labels.size(1)
     device = labels.device
-    
+
     # Vectorized mask creation for valid points
     end_mask = label_pen_states[:, :, 2] == 1
-    
+
     # Create indices tensor for each sequence position
-    position_indices = torch.arange(seq_length, device=device).unsqueeze(0).expand(batch_size, -1)
-    
+    position_indices = torch.arange(
+        seq_length, device=device).unsqueeze(0).expand(batch_size, -1)
+
     # Find the first occurrence of end_mask for each batch
     # If no end marker, use the max sequence length
     has_end = torch.any(end_mask, dim=1)
@@ -47,32 +52,31 @@ def vectorized_reconstruction_loss(predictions, labels):
         first_end_indices,
         torch.tensor(seq_length, device=device).expand(batch_size)
     )
-    
+
     # Create valid mask: positions less than the first end index
     valid_mask = position_indices < first_end_indices.unsqueeze(1)
-    
-    # Vectorized computation of offset losses
-    x_log_probs = log_normal_pdf(
-        predicted_offset_distributions[:, :, 0],
-        predicted_offset_distributions[:, :, 1],
-        label_offsets[:, :, 0]
+
+    m = HyperParameters.NUM_MIXTURES
+
+    gaussian_mixture_probabilities = bivariate_normal_pdf(
+        label_offsets[:, :, 0].unsqueeze(-1).repeat(1, 1, m), 
+        label_offsets[:, :, 1].unsqueeze(-1).repeat(1, 1, m), 
+        predicted_offset_parameters[:, :, m:2 * m],
+        predicted_offset_parameters[:, :, 2 * m:3 * m],
+        predicted_offset_parameters[:, :, 4 * m:5 * m],
+        predicted_offset_parameters[:, :, 5 * m:6 * m],
+        predicted_offset_parameters[:, :, 3 * m:4 * m],
     )
-    
-    y_log_probs = log_normal_pdf(
-        predicted_offset_distributions[:, :, 2],
-        predicted_offset_distributions[:, :, 3],
-        label_offsets[:, :, 1]
-    )
-    
-    offset_loss = -torch.sum(x_log_probs + y_log_probs)
-    
-    # Vectorized pen state loss
-    # Apply softmax along the pen state dimension
-    logits = nn.functional.softmax(predicted_pen_states, dim=2)
-    
-    # Calculate cross entropy loss with mask
-    pen_state_loss = -torch.sum(label_pen_states * torch.log(logits + 1e-8) * valid_mask.unsqueeze(2))
-    
+    weighted_gaussian_mixture_probabilities = predicted_offset_parameters[:, :, :m] * gaussian_mixture_probabilities
+
+    epsilon = 1e-5
+
+    offset_loss = -torch.sum(valid_mask.unsqueeze(2) * torch.log(weighted_gaussian_mixture_probabilities + epsilon))
+
+    logits = nn.functional.softmax(predicted_pen_states, dim=-1)
+
+    pen_state_loss = -torch.sum(label_pen_states * torch.log(logits + epsilon))
+
     total_loss = (pen_state_loss + offset_loss) / (batch_size * HyperParameters.MAX_STROKES)
     return total_loss
 
@@ -86,7 +90,8 @@ def train_model():
                        encoding="latin1")["train"]
 
     sketches_dataset = SketchesDataset(sketches)
-    sketches_data_loader = DataLoader(sketches_dataset, batch_size=HyperParameters.BATCH_SIZE)
+    sketches_data_loader = DataLoader(
+        sketches_dataset, batch_size=HyperParameters.BATCH_SIZE)
 
     print("loaded data.   ")
 
