@@ -10,57 +10,59 @@ import numpy as np
 import time
 import os
 
+log_2pi = torch.log(torch.tensor(2 * torch.pi))
+
+
 def log_normal_pdf(mu, sigma, x):
     return -0.5 * (
-        torch.log(torch.tensor(2 * torch.pi))
+        log_2pi
         + 2 * torch.log(sigma)
         + torch.pow(x - mu, 2) / torch.pow(sigma, 2)
     )
 
-
-def reconstruction_loss(predictions, labels):
+def vectorized_reconstruction_loss(predictions, labels):
     predicted_offset_distributions = predictions[:, :, :4]
     label_offsets = labels[:, :, :2]
-
     predicted_pen_states = predictions[:, :, 4:]
     label_pen_states = labels[:, :, 2:]
-
+    
     end_mask = label_pen_states[:, :, 2] == 1
-
     batch_size = labels.size(0)
+    
+    # Create a mask for valid points
     N_s = torch.zeros(batch_size, dtype=torch.long, device=labels.device)
-
-    # find where the sketches stop
     for b in range(batch_size):
         end_indices = torch.where(end_mask[b])[0]
-        if len(end_indices) > 0:
-            N_s[b] = end_indices[0]
-        else:
-            N_s[b] = len(labels[b])
-
-    offset_loss = torch.zeros(1, device=labels.device)
-    pen_state_loss = torch.zeros(1, device=labels.device)
-
+        N_s[b] = end_indices[0] if len(end_indices) > 0 else len(labels[b])
+    
+    # Create a mask matrix for valid points
+    valid_mask = torch.zeros((batch_size, labels.size(1)), dtype=torch.bool, device=labels.device)
     for b in range(batch_size):
-        offset_loss += -torch.sum(
-            log_normal_pdf(
-                predicted_offset_distributions[b, : N_s[b], 0],
-                predicted_offset_distributions[b, : N_s[b], 1],
-                label_offsets[b, : N_s[b], 0],
-            )
-            + log_normal_pdf(
-                predicted_offset_distributions[b, : N_s[b], 2],
-                predicted_offset_distributions[b, : N_s[b], 3],
-                label_offsets[b, : N_s[b], 1],
-            )
-        )
-
-        logits = nn.functional.softmax(predicted_pen_states[b], dim=1)
-        pen_state_loss += -torch.sum(label_pen_states[b] * torch.log(logits))
-
-    total_loss = (pen_state_loss + offset_loss) / (
-        batch_size * HyperParameters.MAX_STROKES
+        valid_mask[b, :N_s[b]] = True
+    
+    # Vectorized computation of offset losses
+    x_log_probs = log_normal_pdf(
+        predicted_offset_distributions[:, :, 0],
+        predicted_offset_distributions[:, :, 1],
+        label_offsets[:, :, 0]
     )
+    
+    y_log_probs = log_normal_pdf(
+        predicted_offset_distributions[:, :, 2],
+        predicted_offset_distributions[:, :, 3],
+        label_offsets[:, :, 1]
+    )
+    
+    offset_loss = -torch.sum((x_log_probs + y_log_probs) * valid_mask)
+    
+    # Vectorized pen state loss
+    pen_state_loss = 0
+    for b in range(batch_size):
+        # Apply softmax along the correct dimension for each batch element
+        logits = nn.functional.softmax(predicted_pen_states[b, :N_s[b]], dim=1)
+        pen_state_loss -= torch.sum(label_pen_states[b, :N_s[b]] * torch.log(logits + 1e-8))
+    
+    total_loss = (pen_state_loss + offset_loss) / (batch_size * HyperParameters.MAX_STROKES)
     return total_loss
 
 
@@ -69,12 +71,11 @@ def train_model():
 
     load_path = f"data/processed_{HyperParameters.DATA_CATEGORY}.npz"
 
-    sketches = np.load(load_path, allow_pickle=True, encoding="latin1")["train"]
+    sketches = np.load(load_path, allow_pickle=True,
+                       encoding="latin1")["train"]
 
     sketches_dataset = SketchesDataset(sketches)
-    sketches_data_loader = DataLoader(
-        sketches_dataset, batch_size=HyperParameters.BATCH_SIZE
-    )
+    sketches_data_loader = DataLoader(sketches_dataset, batch_size=HyperParameters.BATCH_SIZE)
 
     print("loaded data.   ")
 
@@ -83,7 +84,8 @@ def train_model():
         break
 
     model = SketchDecoder(HyperParameters()).to(HyperParameters.DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=HyperParameters.LEARNING_RATE)
+    optimizer = optim.Adam(
+        model.parameters(), lr=HyperParameters.LEARNING_RATE)
     scheduler = optim.lr_scheduler.ExponentialLR(
         optimizer, gamma=HyperParameters.LEARNING_RATE_DECAY
     )
@@ -113,11 +115,11 @@ def train_model():
             optimizer.zero_grad()
 
             outputs, _ = model(sketch_batch)
-            loss = reconstruction_loss(outputs, sketch_batch)
+            loss = vectorized_reconstruction_loss(outputs, sketch_batch)
 
             loss.backward()
             optimizer.step()
-            
+
             for param_group in optimizer.param_groups:
                 if param_group["lr"] < HyperParameters.MIN_LEARNING_RATE:
                     param_group["lr"] = HyperParameters.MIN_LEARNING_RATE

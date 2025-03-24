@@ -20,7 +20,7 @@ class SketchDecoder(nn.Module):
         # output size should be different if using Gausian Mixture Model
 
     def forward(self, x, hidden_cell=None):
-        start_of_sequence = torch.zeros(x.size()[0], 1, 5).to(
+        start_of_sequence = torch.zeros(x.size(0), 1, 5).to(
             self.hyper_parameters.DEVICE
         )
         start_of_sequence[:, :, 2] = 1  # Set middle feature to 1
