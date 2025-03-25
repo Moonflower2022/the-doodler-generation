@@ -46,12 +46,13 @@ class HyperParameters:
     BIAS = True
     MAX_STROKES = 63
     LEARNING_RATE = 1e-3
-    LEARNING_RATE_DECAY = 1 # 0.9999
+    LEARNING_RATE_DECAY = 0.9999
     MIN_LEARNING_RATE = 0.00001
     BATCH_SIZE = 400
-    DROPOUT = 0.9
     LATENT_VECTOR_SIZE = 128
     NUM_MIXTURES = 20
+    DROPOUT = 0.9
+    GRAD_CLIP = 1.0
 
     def state_dict():
         return {

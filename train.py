@@ -73,6 +73,7 @@ def vectorized_reconstruction_loss(predictions, labels):
 
     offset_loss = -torch.sum(torch.log(torch.sum(valid_mask.unsqueeze(2) * weighted_gaussian_mixture_probabilities, 2) + epsilon))
 
+
     logits = nn.functional.softmax(predicted_pen_states, dim=-1)
 
     pen_state_loss = -torch.sum(label_pen_states * torch.log(logits + epsilon))
@@ -99,22 +100,23 @@ def train_model():
         print("input batch size:", batch.size())
         break
 
-    model = SketchDecoder(HyperParameters()).to(HyperParameters.DEVICE)
-    optimizer = optim.Adam(
-        model.parameters(), lr=HyperParameters.LEARNING_RATE)
-    scheduler = optim.lr_scheduler.ExponentialLR(
-        optimizer, gamma=HyperParameters.LEARNING_RATE_DECAY
-    )
 
     base_folder_name = f"models/decoder_{HyperParameters.DATA_CATEGORY}"
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
 
     logger = get_logger(f"{__name__}.info", f"{folder_name}/train.log")
-    io_logger = get_logger(f"{__name__}.io", f"{folder_name}/input_output.log")
+    model_logger = get_logger(f"{__name__}.model", f"{folder_name}/model.log")
 
     logger.info("Training started")
-    io_logger.info("IO logging initialized")
+    model_logger.info("Model logging initialized")
+
+    model = SketchDecoder(HyperParameters(), model_logger, debug=True).to(HyperParameters.DEVICE)
+    optimizer = optim.Adam(
+        model.parameters(), lr=HyperParameters.LEARNING_RATE)
+    scheduler = optim.lr_scheduler.ExponentialLR(
+        optimizer, gamma=HyperParameters.LEARNING_RATE_DECAY
+    )
 
     print_frequency = 1
     save_frequency = 1
@@ -135,6 +137,7 @@ def train_model():
 
             loss.backward()
             optimizer.step()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), HyperParameters.GRAD_CLIP)
 
             for param_group in optimizer.param_groups:
                 if param_group["lr"] < HyperParameters.MIN_LEARNING_RATE:
@@ -144,8 +147,6 @@ def train_model():
             print(f"[Epoch {epoch + 1}] loss: {loss.item():.2f}")
 
         if (epoch + 1) % log_frequency == 0:
-            io_logger.info(f"inputs[0]: {sketch_batch[0]}")
-            io_logger.info(f"outputs[0]: {outputs[0]}")
             logger.info(f"EPOCH {epoch}")
             logger.info(f"loss: {loss.item():.2f}")
             logger.info(f"learning rate: {optimizer.param_groups[0]["lr"]}")
