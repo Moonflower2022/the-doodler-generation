@@ -29,7 +29,8 @@ class SketchDecoder(nn.Module):
         self.log_model_configuration()
 
         # neural network layers
-        self.lstm = nn.LSTM(5, hidden_size=hyper_parameters.HIDDEN_SIZE)
+        self.lstm = nn.LSTM(5, hidden_size=hyper_parameters.HIDDEN_SIZE, batch_first=True)
+
         self.dropout = nn.Dropout(hyper_parameters.DROPOUT)
         self.linear = nn.Linear(hyper_parameters.HIDDEN_SIZE, 3 + 6 * hyper_parameters.NUM_MIXTURES)
 
@@ -98,7 +99,7 @@ class SketchDecoder(nn.Module):
 
         if hidden_cell is None:
             hidden = torch.zeros(
-                (1, self.hyper_parameters.MAX_STROKES, self.hyper_parameters.HIDDEN_SIZE),
+                (1, self.hyper_parameters.BATCH_SIZE, self.hyper_parameters.HIDDEN_SIZE),
                 dtype=torch.float32
             ).to(device=self.hyper_parameters.DEVICE)
             cell = torch.zeros_like(hidden)
@@ -139,7 +140,7 @@ class SketchDecoder(nn.Module):
             )
 
         if hidden_cell is None:
-            hidden = torch.zeros(1, self.hyper_parameters.HIDDEN_SIZE, dtype=torch.float32) \
+            hidden = torch.zeros(1, self.hyper_parameters.BATCH_SIZE, dtype=torch.float32) \
                 .to(device=self.hyper_parameters.DEVICE)
             cell = torch.zeros_like(hidden)
             hidden_cell = (hidden, cell)

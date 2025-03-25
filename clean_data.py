@@ -1,5 +1,5 @@
 import numpy as np
-from utils import HyperParameters, get_max_strokes
+from utils import HyperParameters
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset
 import torch

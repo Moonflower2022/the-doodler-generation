@@ -111,7 +111,7 @@ def train_model():
     logger.info("Training started")
     model_logger.info("Model logging initialized")
 
-    model = SketchDecoder(HyperParameters(), model_logger, debug=True).to(HyperParameters.DEVICE)
+    model = SketchDecoder(HyperParameters(), model_logger, debug=False).to(HyperParameters.DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=HyperParameters.LEARNING_RATE)
     scheduler = optim.lr_scheduler.ExponentialLR(
