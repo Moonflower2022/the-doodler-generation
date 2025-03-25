@@ -71,7 +71,7 @@ def vectorized_reconstruction_loss(predictions, labels):
 
     epsilon = 1e-5
 
-    offset_loss = -torch.sum(valid_mask.unsqueeze(2) * torch.log(weighted_gaussian_mixture_probabilities + epsilon))
+    offset_loss = -torch.sum(torch.log(torch.sum(valid_mask.unsqueeze(2) * weighted_gaussian_mixture_probabilities, 2) + epsilon))
 
     logits = nn.functional.softmax(predicted_pen_states, dim=-1)
 
