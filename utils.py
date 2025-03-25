@@ -53,6 +53,7 @@ class HyperParameters:
     NUM_MIXTURES = 20
     DROPOUT = 0.9
     GRAD_CLIP = 1.0
+    EPSILON = 1e-5
 
     def state_dict():
         return {

@@ -3,6 +3,11 @@ from utils import HyperParameters, get_logger
 from torch import nn
 import logging
 
+torch.autograd.set_detect_anomaly(True)
+
+def safe_exp(x, max_val=88.0):
+    return torch.exp(torch.clamp(x, max=max_val))
+
 def sample_bivariate_normal(sigma_x, sigma_y, rho_xy, mu_x, mu_y):
     mean = torch.tensor([mu_x, mu_y])
     covariance_matrix = torch.tensor([
@@ -117,21 +122,26 @@ class SketchDecoder(nn.Module):
         m = self.hyper_parameters.NUM_MIXTURES
 
 
-        stroke_parameters[:, :, :m] = torch.softmax(stroke_parameters[:, :, :m], dim=-1)
+        mixture_weights = torch.softmax(stroke_parameters[:, :, :m], dim=-1)
         self.log_tensor_detailed_stats(stroke_parameters[:, :, :m], "Transformed Mixture Weights (pi)")
 
-        stroke_parameters[:, :, m:3 * m] = torch.exp(stroke_parameters[:, :, m:3 * m])
+        sigmas = safe_exp(stroke_parameters[:, :, m:3 * m])
         self.log_tensor_detailed_stats(stroke_parameters[:, :, m:3 * m], "Transformed Sigmas")
 
-        stroke_parameters[:, :, 3 * m:4 * m] = torch.tanh(stroke_parameters[:, :, 3 * m:4 * m])
-        self.log_tensor_detailed_stats(stroke_parameters[:, :, 3 * m:4 * m], "Transformed Rho")
+        rhos = torch.tanh(stroke_parameters[:, :, 3 * m:4 * m])
+        self.log_tensor_detailed_stats(stroke_parameters[:, :, 3 * m:4 * m], "Transformed Rho's")
 
-        stroke_parameters[:, :, 6 * m:] = torch.softmax(stroke_parameters[:, :, 6 * m:], dim=-1)
-        self.log_tensor_detailed_stats(stroke_parameters[:, :, 6 * m:], "Transformed Pen State")
+        mus = stroke_parameters[:, :, 4 * m:6 * m]
+        self.log_tensor_detailed_stats(stroke_parameters[:, :, 3 * m:4 * m], "Transformed Mu's")
+                         
+        pen_states = torch.softmax(stroke_parameters[:, :, 6 * m:], dim=-1)
+        self.log_tensor_detailed_stats(stroke_parameters[:, :, 6 * m:], "Transformed Pen States")
 
-        self.log_tensor_detailed_stats(stroke_parameters, "Final Processed Stroke Parameters")
+        processed_stroke_parameters = torch.cat([mixture_weights, sigmas, rhos, mus, pen_states], dim=2)
 
-        return (stroke_parameters, hidden_cell)
+        self.log_tensor_detailed_stats(processed_stroke_parameters, "Final Processed Stroke Parameters")
+
+        return (processed_stroke_parameters, hidden_cell)
 
     def generate_stroke(self, last_stroke=None, hidden_cell=None):
         if last_stroke is None:

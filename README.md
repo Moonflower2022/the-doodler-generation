@@ -17,9 +17,13 @@ Generation models for the quick, draw! dataset by google that are based on the S
 ## todo
 
 * fix model
-  * currently really slow
-  * is able to generate a variety of random shapes at ~180 epochs
-  * 
+  * go in model and log a buncha stuff, check that stuff is actually in the right places
+  * lstm initialization?
+  * anything else im not doing for decoder
+    * look at other models
+      * 2 pytorch implementations
+      * 1 tf implementation (og)
+  * why nan????
 * data
   * find only the data that google's model was able to classify
 * generate lots of images
