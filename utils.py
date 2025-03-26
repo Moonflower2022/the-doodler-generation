@@ -53,7 +53,7 @@ class HyperParameters:
     NUM_MIXTURES = 20
     DROPOUT = 0.9
     GRAD_CLIP = 1.0
-    EPSILON = 1e-5
+    EPSILON = 1e-6
 
     def state_dict():
         return {
@@ -80,6 +80,37 @@ def get_logger(name, log_file, level=logging.INFO):
     logger.addHandler(handler)
 
     return logger
+
+def log_tensor_detailed_stats(logger, tensor, tensor_name="", level=logging.INFO):
+    """Provide comprehensive tensor statistics."""
+    if logger:
+        if tensor is None:
+            logger.warning(f"{tensor_name}: Tensor is None!")
+            return
+
+        # tensor stats
+        stats = {
+            'shape': tensor.shape,
+            'dtype': tensor.dtype,
+            'min': tensor.min().item() if tensor.numel() > 0 else 'N/A',
+            'max': tensor.max().item() if tensor.numel() > 0 else 'N/A', 
+            'mean': tensor.mean().item() if tensor.numel() > 0 else 'N/A',
+            'std': tensor.std().item() if tensor.numel() > 0 else 'N/A',
+            'nan_count': torch.isnan(tensor).sum().item(),
+            'inf_count': torch.isinf(tensor).sum().item()
+        }
+
+        log_message = f"{tensor_name} Tensor Statistics:\n" + \
+                    "\n".join(f"  {k}: {v}" for k, v in stats.items())
+        
+        logger.log(level, log_message)
+
+        # error checking
+        if stats['nan_count'] > 0:
+            logger.critical(f"NaN DETECTED in {tensor_name}!")
+        
+        if stats['inf_count'] > 0:
+            logger.critical(f"Inf DETECTED in {tensor_name}!")
 
 if __name__ == "__main__":
     import numpy as np

@@ -1,12 +1,11 @@
 import torch
-from utils import HyperParameters, get_logger
+from utils import HyperParameters, log_tensor_detailed_stats
 from torch import nn
-import logging
 
 torch.autograd.set_detect_anomaly(True)
 
-def safe_exp(x, max_val=88.0):
-    return torch.exp(torch.clamp(x, max=max_val))
+def safe_exp(x, max_val=20.0):
+    return torch.clamp(torch.exp(x), max=max_val)
 
 def sample_bivariate_normal(sigma_x, sigma_y, rho_xy, mu_x, mu_y):
     mean = torch.tensor([mu_x, mu_y])
@@ -41,7 +40,7 @@ class SketchDecoder(nn.Module):
 
     def log_model_configuration(self):
         """Log detailed model configuration for debugging."""
-        if self.logger:
+        if self.logger and self.debug:
             config_info = f"""
             SketchDecoder Configuration:
             -------------------------
@@ -57,41 +56,12 @@ class SketchDecoder(nn.Module):
         if self.debug:
             print(*args, **kwargs)
 
-    def log_tensor_detailed_stats(self, tensor, message="", level=logging.INFO):
-        """Provide comprehensive tensor statistics."""
-        if self.logger:
-            if tensor is None:
-                self.logger.warning(f"{message}: Tensor is None!")
-                return
-
-            # tensor stats
-            stats = {
-                'shape': tensor.shape,
-                'dtype': tensor.dtype,
-                'min': tensor.min().item() if tensor.numel() > 0 else 'N/A',
-                'max': tensor.max().item() if tensor.numel() > 0 else 'N/A', 
-                'mean': tensor.mean().item() if tensor.numel() > 0 else 'N/A',
-                'std': tensor.std().item() if tensor.numel() > 0 else 'N/A',
-                'nan_count': torch.isnan(tensor).sum().item(),
-                'inf_count': torch.isinf(tensor).sum().item()
-            }
-
-            log_message = f"{message} Tensor Statistics:\n" + \
-                        "\n".join(f"  {k}: {v}" for k, v in stats.items())
-            
-            self.logger.log(level, log_message)
-
-            # error checking
-            if stats['nan_count'] > 0:
-                self.logger.critical(f"NaN DETECTED in {message}!")
-                self.debug_print(f"NaN Tensor: {tensor}")
-            
-            if stats['inf_count'] > 0:
-                self.logger.critical(f"Inf DETECTED in {message}!")
-                self.debug_print(f"Inf Tensor: {tensor}")
+    def debug_log(self, *args, **kwargs):
+        if self.debug and self.logger:
+            log_tensor_detailed_stats(self.logger, *args, **kwargs)
 
     def forward(self, x, hidden_cell=None):
-        self.log_tensor_detailed_stats(x, "Input Tensor")
+        self.debug_log(x, "Input Tensor")
 
         start_of_sequence = torch.zeros(x.size(0), 1, 5).to(
             self.hyper_parameters.DEVICE
@@ -102,7 +72,7 @@ class SketchDecoder(nn.Module):
 
         inputs = torch.cat([start_of_sequence, x_shifted], dim=1)
         
-        self.log_tensor_detailed_stats(inputs, "Processed Input Sequence")
+        self.debug_log(inputs, "Processed Input Sequence")
 
         if hidden_cell is None:
             hidden = torch.zeros(
@@ -115,33 +85,33 @@ class SketchDecoder(nn.Module):
         lstm_outputs, hidden_cell = self.lstm(inputs, hidden_cell)
         lstm_outputs = self.dropout(lstm_outputs)
 
-        self.log_tensor_detailed_stats(lstm_outputs, "LSTM Outputs")
+        self.debug_log(lstm_outputs, "LSTM Outputs")
 
         stroke_parameters = self.linear(lstm_outputs)
         
-        self.log_tensor_detailed_stats(stroke_parameters, "Raw Stroke Parameters")
+        self.debug_log(stroke_parameters, "Raw Stroke Parameters")
 
         m = self.hyper_parameters.NUM_MIXTURES
 
 
         mixture_weights = torch.softmax(stroke_parameters[:, :, :m], dim=-1)
-        self.log_tensor_detailed_stats(stroke_parameters[:, :, :m], "Transformed Mixture Weights (pi)")
+        self.debug_log(mixture_weights, "Transformed Mixture Weights (pi)")
 
         sigmas = safe_exp(stroke_parameters[:, :, m:3 * m])
-        self.log_tensor_detailed_stats(stroke_parameters[:, :, m:3 * m], "Transformed Sigmas")
+        self.debug_log(sigmas, "Transformed Sigmas")
 
         rhos = torch.tanh(stroke_parameters[:, :, 3 * m:4 * m])
-        self.log_tensor_detailed_stats(stroke_parameters[:, :, 3 * m:4 * m], "Transformed Rho's")
+        self.debug_log(rhos, "Transformed Rho's")
 
         mus = stroke_parameters[:, :, 4 * m:6 * m]
-        self.log_tensor_detailed_stats(stroke_parameters[:, :, 3 * m:4 * m], "Transformed Mu's")
+        self.debug_log(mus, "Mu's")
                          
         pen_states = torch.softmax(stroke_parameters[:, :, 6 * m:], dim=-1)
-        self.log_tensor_detailed_stats(stroke_parameters[:, :, 6 * m:], "Transformed Pen States")
+        self.debug_log(pen_states, "Transformed Pen States")
 
         processed_stroke_parameters = torch.cat([mixture_weights, sigmas, rhos, mus, pen_states], dim=2)
 
-        self.log_tensor_detailed_stats(processed_stroke_parameters, "Final Processed Stroke Parameters")
+        self.debug_log(processed_stroke_parameters, "Final Processed Stroke Parameters")
 
         return (processed_stroke_parameters, hidden_cell)
 
@@ -157,16 +127,16 @@ class SketchDecoder(nn.Module):
             cell = torch.zeros_like(hidden)
             hidden_cell = (hidden, cell)
 
-        self.log_tensor_detailed_stats(last_stroke, "Last Stroke Input")
+        log_tensor_detailed_stats(self.logger, last_stroke, "Last Stroke Input")
         
         lstm_outputs, hidden_cell = self.lstm(last_stroke.unsqueeze(0), hidden_cell)
         lstm_outputs = self.dropout(lstm_outputs)
 
-        self.log_tensor_detailed_stats(lstm_outputs, "Generate Stroke LSTM Outputs")
+        log_tensor_detailed_stats(self.logger, lstm_outputs, "Generate Stroke LSTM Outputs")
 
         stroke_parameters = self.linear(lstm_outputs[-1])
         
-        self.log_tensor_detailed_stats(stroke_parameters, "Generate Stroke Parameters")
+        log_tensor_detailed_stats(self.logger, stroke_parameters, "Generate Stroke Parameters")
 
         gaussian_parameters, pen_state_logits = (
             stroke_parameters[:-3],
@@ -181,8 +151,8 @@ class SketchDecoder(nn.Module):
         
         pen_state_probabilities = torch.softmax(pen_state_logits, dim=-1)
 
-        self.log_tensor_detailed_stats(gaussian_parameters, "Processed Gaussian Parameters")
-        self.log_tensor_detailed_stats(pen_state_probabilities, "Pen State Probabilities")
+        log_tensor_detailed_stats(self.logger, gaussian_parameters, "Processed Gaussian Parameters")
+        log_tensor_detailed_stats(self.logger, pen_state_probabilities, "Pen State Probabilities")
 
         index = torch.multinomial(gaussian_parameters[:m], num_samples=1)[0]
 
