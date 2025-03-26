@@ -23,13 +23,13 @@ def sample_bivariate_normal(sigma_x, sigma_y, rho_xy, mu_x, mu_y):
 
 
 class SketchDecoder(nn.Module):
-    def __init__(self, hyper_parameters, logger=None, debug=False):
+    def __init__(self, hyper_parameters, logger=False, debug=False):
         super(SketchDecoder, self).__init__()
         self.hyper_parameters = hyper_parameters
         self.debug = debug
         
         # set up logging
-        self.logger = logger or get_logger('SketchDecoder')
+        self.logger = logger
         
         self.log_model_configuration()
 
@@ -41,16 +41,17 @@ class SketchDecoder(nn.Module):
 
     def log_model_configuration(self):
         """Log detailed model configuration for debugging."""
-        config_info = f"""
-        SketchDecoder Configuration:
-        -------------------------
-        HIDDEN_SIZE: {self.hyper_parameters.HIDDEN_SIZE}
-        NUM_MIXTURES: {self.hyper_parameters.NUM_MIXTURES}
-        DROPOUT: {self.hyper_parameters.DROPOUT}
-        DEVICE: {self.hyper_parameters.DEVICE}
-        DEBUG MODE: {self.debug}
-        """
-        self.logger.info(config_info)
+        if self.logger:
+            config_info = f"""
+            SketchDecoder Configuration:
+            -------------------------
+            HIDDEN_SIZE: {self.hyper_parameters.HIDDEN_SIZE}
+            NUM_MIXTURES: {self.hyper_parameters.NUM_MIXTURES}
+            DROPOUT: {self.hyper_parameters.DROPOUT}
+            DEVICE: {self.hyper_parameters.DEVICE}
+            DEBUG MODE: {self.debug}
+            """
+            self.logger.info(config_info)
 
     def debug_print(self, *args, **kwargs):
         if self.debug:
@@ -58,35 +59,36 @@ class SketchDecoder(nn.Module):
 
     def log_tensor_detailed_stats(self, tensor, message="", level=logging.INFO):
         """Provide comprehensive tensor statistics."""
-        if tensor is None:
-            self.logger.warning(f"{message}: Tensor is None!")
-            return
+        if self.logger:
+            if tensor is None:
+                self.logger.warning(f"{message}: Tensor is None!")
+                return
 
-        # tensor stats
-        stats = {
-            'shape': tensor.shape,
-            'dtype': tensor.dtype,
-            'min': tensor.min().item() if tensor.numel() > 0 else 'N/A',
-            'max': tensor.max().item() if tensor.numel() > 0 else 'N/A', 
-            'mean': tensor.mean().item() if tensor.numel() > 0 else 'N/A',
-            'std': tensor.std().item() if tensor.numel() > 0 else 'N/A',
-            'nan_count': torch.isnan(tensor).sum().item(),
-            'inf_count': torch.isinf(tensor).sum().item()
-        }
+            # tensor stats
+            stats = {
+                'shape': tensor.shape,
+                'dtype': tensor.dtype,
+                'min': tensor.min().item() if tensor.numel() > 0 else 'N/A',
+                'max': tensor.max().item() if tensor.numel() > 0 else 'N/A', 
+                'mean': tensor.mean().item() if tensor.numel() > 0 else 'N/A',
+                'std': tensor.std().item() if tensor.numel() > 0 else 'N/A',
+                'nan_count': torch.isnan(tensor).sum().item(),
+                'inf_count': torch.isinf(tensor).sum().item()
+            }
 
-        log_message = f"{message} Tensor Statistics:\n" + \
-                      "\n".join(f"  {k}: {v}" for k, v in stats.items())
-        
-        self.logger.log(level, log_message)
+            log_message = f"{message} Tensor Statistics:\n" + \
+                        "\n".join(f"  {k}: {v}" for k, v in stats.items())
+            
+            self.logger.log(level, log_message)
 
-        # error checking
-        if stats['nan_count'] > 0:
-            self.logger.critical(f"NaN DETECTED in {message}!")
-            self.debug_print(f"NaN Tensor: {tensor}")
-        
-        if stats['inf_count'] > 0:
-            self.logger.critical(f"Inf DETECTED in {message}!")
-            self.debug_print(f"Inf Tensor: {tensor}")
+            # error checking
+            if stats['nan_count'] > 0:
+                self.logger.critical(f"NaN DETECTED in {message}!")
+                self.debug_print(f"NaN Tensor: {tensor}")
+            
+            if stats['inf_count'] > 0:
+                self.logger.critical(f"Inf DETECTED in {message}!")
+                self.debug_print(f"Inf Tensor: {tensor}")
 
     def forward(self, x, hidden_cell=None):
         self.log_tensor_detailed_stats(x, "Input Tensor")
