@@ -1,11 +1,8 @@
 import torch
-from utils import HyperParameters, log_tensor_detailed_stats
+from utils import HyperParameters, log_tensor_detailed_stats, safe_exp
 from torch import nn
 
 torch.autograd.set_detect_anomaly(True)
-
-def safe_exp(x, max_val=20.0):
-    return torch.clamp(torch.exp(x), max=max_val)
 
 def sample_bivariate_normal(sigma_x, sigma_y, rho_xy, mu_x, mu_y):
     mean = torch.tensor([mu_x, mu_y])
@@ -97,10 +94,10 @@ class SketchDecoder(nn.Module):
         mixture_weights = torch.softmax(stroke_parameters[:, :, :m], dim=-1)
         self.debug_log(mixture_weights, "Transformed Mixture Weights (pi)")
 
-        sigmas = safe_exp(stroke_parameters[:, :, m:3 * m])
+        sigmas = torch.clamp_min(safe_exp(stroke_parameters[:, :, m:3 * m]), 1e-5)
         self.debug_log(sigmas, "Transformed Sigmas")
 
-        rhos = torch.tanh(stroke_parameters[:, :, 3 * m:4 * m])
+        rhos = torch.clamp(torch.tanh(stroke_parameters[:, :, 3 * m:4 * m]), min=-1 + 1e-5, max=1 - 1e-5)
         self.debug_log(rhos, "Transformed Rho's")
 
         mus = stroke_parameters[:, :, 4 * m:6 * m]
@@ -122,7 +119,7 @@ class SketchDecoder(nn.Module):
             )
 
         if hidden_cell is None:
-            hidden = torch.zeros(1, self.hyper_parameters.BATCH_SIZE, dtype=torch.float32) \
+            hidden = torch.zeros(1, self.hyper_parameters.HIDDEN_SIZE, dtype=torch.float32) \
                 .to(device=self.hyper_parameters.DEVICE)
             cell = torch.zeros_like(hidden)
             hidden_cell = (hidden, cell)
