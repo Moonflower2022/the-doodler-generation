@@ -56,9 +56,9 @@ class HyperParameters:
     BATCH_SIZE = 400
     LATENT_VECTOR_SIZE = 128
     NUM_MIXTURES = 20
-    DROPOUT = 0.9
+    DROPOUT = 0
     GRAD_CLIP = 1.0
-    EPSILON = 1e-6
+    EPSILON = 1e-5
 
     def state_dict():
         return {
