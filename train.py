@@ -3,7 +3,6 @@ from utils import (
     get_logger,
     HyperParameters,
     log_tensor_detailed_stats,
-    safe_exp,
     safe_divide,
 )
 from clean_data import SketchesDataset
@@ -46,7 +45,8 @@ def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy, logger=No
     z = z_x + z_y - z_xy
     log_tensor_detailed_stats(logger, z, "z")
 
-    clipped_z = torch.clamp(z, min=0, max=1e5)
+    clipped_z = torch.clamp(z, 1e-3, 1e3)
+    log_tensor_detailed_stats(logger, clipped_z, "clipped_z")
 
     top = torch.exp(safe_divide(-clipped_z, 2 * (1 - rho_xy ** 2)))
     log_tensor_detailed_stats(logger, top, "top")

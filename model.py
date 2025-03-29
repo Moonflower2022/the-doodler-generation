@@ -94,7 +94,7 @@ class SketchDecoder(nn.Module):
         mixture_weights = torch.softmax(stroke_parameters[:, :, :m], dim=-1)
         self.debug_log(mixture_weights, "Transformed Mixture Weights (pi)")
 
-        sigmas = torch.clamp_min(safe_exp(stroke_parameters[:, :, m:3 * m]), 1e-5)
+        sigmas = torch.clamp_min(safe_exp(stroke_parameters[:, :, m:3 * m], max_val=10), 1e-5)
         self.debug_log(sigmas, "Transformed Sigmas")
 
         rhos = torch.clamp(torch.tanh(stroke_parameters[:, :, 3 * m:4 * m]), min=-1 + 1e-5, max=1 - 1e-5)

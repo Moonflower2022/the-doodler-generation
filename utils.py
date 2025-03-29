@@ -8,8 +8,8 @@ device = (
     else "mps" if torch.backends.mps.is_available() else "cpu"
 )
 
-def safe_exp(x, max_val=500.0):
-    return torch.clamp(torch.exp(x), max=max_val)
+def safe_exp(x, max_val=10.0):
+    return torch.exp(torch.clamp(x, max=max_val))
 
 def safe_divide(numerator, denominator):
     return numerator / (torch.abs(denominator) + HyperParameters.EPSILON) * torch.sign(denominator)
@@ -51,7 +51,7 @@ class HyperParameters:
     BIAS = True
     MAX_STROKES = 63
     LEARNING_RATE = 1e-3
-    LEARNING_RATE_DECAY = 0.99999
+    LEARNING_RATE_DECAY = 0.9999
     MIN_LEARNING_RATE = 0.00001
     BATCH_SIZE = 400
     LATENT_VECTOR_SIZE = 128
