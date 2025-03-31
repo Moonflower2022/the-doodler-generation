@@ -4,6 +4,7 @@ from utils import (
     HyperParameters,
     log_tensor_detailed_stats,
     safe_divide,
+    replace_last
 )
 from clean_data import SketchesDataset
 from model import SketchDecoder
@@ -16,7 +17,8 @@ import numpy as np
 import time
 import os
 import logging
-import sys
+import argparse
+
 
 def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy, logger=None):
     z_x_top = dx - mu_x
@@ -48,7 +50,7 @@ def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy, logger=No
     clipped_z = torch.clamp(z, 1e-3, 1e3)
     log_tensor_detailed_stats(logger, clipped_z, "clipped_z")
 
-    top = torch.exp(safe_divide(-clipped_z, 2 * (1 - rho_xy ** 2)))
+    top = torch.exp(safe_divide(-clipped_z, 2 * (1 - rho_xy**2)))
     log_tensor_detailed_stats(logger, top, "top")
 
     norm = (
@@ -133,7 +135,7 @@ def vectorized_reconstruction_loss(predictions, labels, logger=None):
 
 def log_gradient_statistics(model, logger):
     """
-    Log gradient statistics for model parameters
+    log gradient statistics for model parameters
     """
     total_norm = 0
     parameter_norms = {}
@@ -156,7 +158,7 @@ def log_gradient_statistics(model, logger):
         logger.info(f"Gradient Norm - {name}: {norm:.4f}")
 
 
-def train_model(debug):
+def train_model(debug, model_path=None):
     print("loading data:", end="\r")
 
     load_path = f"data/processed_{HyperParameters.DATA_CATEGORY}.npz"
@@ -174,7 +176,7 @@ def train_model(debug):
         print("input batch size:", batch.size())
         break
 
-    base_folder_name = f"models/decoder_{HyperParameters.DATA_CATEGORY}"
+    base_folder_name = f"models/decoder_{HyperParameters.DATA_CATEGORY}" if not model_path else replace_last(f"{model_path}+", "/", "\\")
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
 
@@ -198,9 +200,20 @@ def train_model(debug):
     model_logger.info("Model logging initialized")
     gradient_logger.info("Gradient logging initialized")
 
-    model = SketchDecoder(HyperParameters(), model_logger, debug=debug).to(
-        HyperParameters.DEVICE
-    )
+    if model_path:
+        info = torch.load(model_path, weights_only=False)
+
+        hyper_parameters = HyperParameters()
+        hyper_parameters.input_state(info["hyper_parameters"])
+
+        model = SketchDecoder(
+            hyper_parameters, model_logger, debug=debug
+        ).to(HyperParameters.DEVICE)
+        model.load_state_dict(info["state_dict"])
+    else:
+        model = SketchDecoder(HyperParameters(), model_logger, debug=debug).to(
+            HyperParameters.DEVICE
+        )
     optimizer = optim.Adam(model.parameters(), lr=HyperParameters.LEARNING_RATE)
     scheduler = optim.lr_scheduler.ExponentialLR(
         optimizer, gamma=HyperParameters.LEARNING_RATE_DECAY
@@ -231,7 +244,9 @@ def train_model(debug):
             loss.backward()
 
             # Clip gradients
-            torch.nn.utils.clip_grad_norm_(model.parameters(), HyperParameters.GRAD_CLIP)
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), HyperParameters.GRAD_CLIP
+            )
 
             optimizer.step()
 
@@ -270,10 +285,23 @@ def train_model(debug):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and (sys.argv[1] == "-h" or sys.argv[1] == "--help"):
-        print(
-            f"do {sys.argv[0]} for normal training\ndo {sys.argv[0]} -d for debug\ndo {sys.argv[0]} -h for help"
-        )
-        exit(0)
-    debug = len(sys.argv) > 1 and sys.argv[1] == "-d"
-    train_model(debug)
+    parser = argparse.ArgumentParser(
+        description="train a decoder"
+    )
+    parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode.")
+    parser.add_argument(
+        "-l",
+        "--load",
+        type=str,
+        metavar="MODEL_PATH",
+        help="Specify the model path to load and train.",
+    )
+
+    args = parser.parse_args()
+
+    if args.debug:
+        print("Debug mode enabled.")
+
+    model_path = args.load
+
+    train_model(args.debug, model_path=model_path)
