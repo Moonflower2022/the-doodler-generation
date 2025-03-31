@@ -254,7 +254,7 @@ def train_model(debug):
             logger.info(f"Total Training Time: {time.time() - start_time:.2f}s")
 
         if (epoch + 1) % save_frequency == 0:
-            save_filename = f"{folder_name}/epoch_{epoch+1}_loss_{loss.item():.2f}.pth"
+            save_filename = f"{folder_name}/epoch_{epoch}_loss_{loss.item():.2f}.pth"
             torch.save(
                 {
                     "model_class_name": model.__class__.__name__,
