@@ -4,7 +4,7 @@ from utils import (
     HyperParameters,
     log_tensor_detailed_stats,
     safe_divide,
-    replace_last
+    replace_last,
 )
 from clean_data import SketchesDataset
 from model import SketchDecoder
@@ -53,13 +53,7 @@ def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy, logger=No
     top = torch.exp(safe_divide(-clipped_z, 2 * (1 - rho_xy**2)))
     log_tensor_detailed_stats(logger, top, "top")
 
-    norm = (
-        2
-        * np.pi
-        * sigma_x
-        * sigma_y
-        * torch.sqrt(1 - rho_xy**2)
-    )
+    norm = 2 * np.pi * sigma_x * sigma_y * torch.sqrt(1 - rho_xy**2)
     log_tensor_detailed_stats(logger, norm, "bottom")
 
     return safe_divide(top, norm)
@@ -176,7 +170,11 @@ def train_model(debug, model_path=None):
         print("input batch size:", batch.size())
         break
 
-    base_folder_name = f"models/decoder_{HyperParameters.DATA_CATEGORY}" if not model_path else replace_last(f"{model_path}+", "/", "_")
+    base_folder_name = (
+        f"models/decoder_{HyperParameters.DATA_CATEGORY}"
+        if not model_path
+        else replace_last(f"{model_path}+", "/", "_")
+    )
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
 
@@ -206,9 +204,9 @@ def train_model(debug, model_path=None):
         hyper_parameters = HyperParameters()
         hyper_parameters.input_state(info["hyper_parameters"])
 
-        model = SketchDecoder(
-            hyper_parameters, model_logger, debug=debug
-        ).to(HyperParameters.DEVICE)
+        model = SketchDecoder(hyper_parameters, model_logger, debug=debug).to(
+            HyperParameters.DEVICE
+        )
         model.load_state_dict(info["state_dict"])
     else:
         model = SketchDecoder(HyperParameters(), model_logger, debug=debug).to(
@@ -285,9 +283,7 @@ def train_model(debug, model_path=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="train a decoder"
-    )
+    parser = argparse.ArgumentParser(description="train a decoder")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode.")
     parser.add_argument(
         "-l",

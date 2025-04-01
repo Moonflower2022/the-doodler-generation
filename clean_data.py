@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 import torch
 import random
 
+
 class SketchesDataset(Dataset):
     def __init__(self, sketches):
         self.sketches = sketches

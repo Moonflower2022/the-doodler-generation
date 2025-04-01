@@ -15,22 +15,22 @@ Generation models for the quick, draw! dataset by google that are based on the S
 
 ## todo
 
-* data
-  * find only the data that google's model was able to classify
-* generate lots of images
-* make game
+-   data
+    -   find only the data that google's model was able to classify
+-   generate lots of images
+-   make game
 
 ## references
 
-* <https://nn.labml.ai/sketch_rnn/index.html>
-  * annotated pytorch implementation of sketchrnn
-* <https://github.com/alexis-jacq/Pytorch-Sketch-RNN>
-  * another pytorch implementation of sketchrnn
-* <https://github.com/rfeinman/Sketch-RNN>
-  * another pytorch implementation of sketchrnn
-* <https://arxiv.org/pdf/1308.0850>
-  * generalized strokes training
-* <https://arxiv.org/pdf/1704.03477>
-  * sketch rnn paper
-* <https://github.com/magenta/magenta/tree/main/magenta/models/sketch_rnn>
-  * TF implementation of sketch rnn
+-   <https://nn.labml.ai/sketch_rnn/index.html>
+    -   annotated pytorch implementation of sketchrnn
+-   <https://github.com/alexis-jacq/Pytorch-Sketch-RNN>
+    -   another pytorch implementation of sketchrnn
+-   <https://github.com/rfeinman/Sketch-RNN>
+    -   another pytorch implementation of sketchrnn
+-   <https://arxiv.org/pdf/1308.0850>
+    -   generalized strokes training
+-   <https://arxiv.org/pdf/1704.03477>
+    -   sketch rnn paper
+-   <https://github.com/magenta/magenta/tree/main/magenta/models/sketch_rnn>
+    -   TF implementation of sketch rnn

@@ -7,6 +7,7 @@ import sys
 import os
 import argparse
 
+
 def load_model(model_path=None):
     if model_path is None:
         with open("models/latest_experiment.txt", "r") as file:
@@ -39,9 +40,7 @@ def load_model(model_path=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="load a decoder"
-    )
+    parser = argparse.ArgumentParser(description="load a decoder")
     parser.add_argument(
         "-l",
         "--load",
@@ -53,4 +52,3 @@ if __name__ == "__main__":
 
     model_path = args.load
     load_model(model_path=model_path)
-    
