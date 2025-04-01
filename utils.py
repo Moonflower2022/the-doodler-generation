@@ -37,10 +37,16 @@ def get_available_folder_name(base_name, directory="."):
 def get_max_strokes(data):
     return max([len(sketch) for sketch in data]) + 1
 
+def replace_last(s, old, new):
+    parts = s.rsplit(old, 1)  # Split from the right, at most once
+    return new.join(parts)
+
 
 class HyperParameters:
-    DATA_CATEGORY = "apple"
+    DATA_CATEGORY = "octopus"
     DEVICE = device
+
+    # MODEL ARCHITECTURE (cannot change while training the same model)
     INPUT_SIZE = 5
     # ∆x,
     # ∆y,
@@ -49,15 +55,17 @@ class HyperParameters:
     # end (current point and subsequent points are voided)
     HIDDEN_SIZE = 512
     BIAS = True
-    MAX_STROKES = 63
-    LEARNING_RATE = 1e-3
-    LEARNING_RATE_DECAY = 0.9999
-    MIN_LEARNING_RATE = 0.00001
-    BATCH_SIZE = 400
-    LATENT_VECTOR_SIZE = 128
+    MAX_STROKES = 132
     NUM_MIXTURES = 20
-    DROPOUT = 0
-    GRAD_CLIP = 1.0
+    LATENT_VECTOR_SIZE = 128 # not used
+
+    # HYPER PARAMETERS (can change while training the same model)
+    LEARNING_RATE = 1e-3
+    LEARNING_RATE_DECAY = 0.996
+    MIN_LEARNING_RATE = 1e-5
+    BATCH_SIZE = 100
+    DROPOUT = 0.
+    GRAD_CLIP = 1.
     EPSILON = 1e-5
 
     def state_dict():

@@ -47,7 +47,7 @@ def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy, logger=No
     z = z_x + z_y - z_xy
     log_tensor_detailed_stats(logger, z, "z")
 
-    clipped_z = torch.clamp(z, 1e-3, 1e3)
+    clipped_z = torch.clamp(z, 1e-5, 1e7)
     log_tensor_detailed_stats(logger, clipped_z, "clipped_z")
 
     top = torch.exp(safe_divide(-clipped_z, 2 * (1 - rho_xy**2)))
@@ -58,7 +58,7 @@ def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy, logger=No
         * np.pi
         * sigma_x
         * sigma_y
-        * torch.sqrt(1 - rho_xy**2 + HyperParameters.EPSILON)
+        * torch.sqrt(1 - rho_xy**2)
     )
     log_tensor_detailed_stats(logger, norm, "bottom")
 
@@ -176,7 +176,7 @@ def train_model(debug, model_path=None):
         print("input batch size:", batch.size())
         break
 
-    base_folder_name = f"models/decoder_{HyperParameters.DATA_CATEGORY}" if not model_path else replace_last(f"{model_path}+", "/", "\\")
+    base_folder_name = f"models/decoder_{HyperParameters.DATA_CATEGORY}" if not model_path else replace_last(f"{model_path}+", "/", "_")
     folder_name = get_available_folder_name(base_folder_name)
     os.makedirs(folder_name, exist_ok=True)
 
