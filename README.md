@@ -4,14 +4,18 @@ Generation models for the quick, draw! dataset by google that are based on the S
 
 ## usage
 
-1. go to `utils.py` and change `HyperParameters.DATA_CATEGORY` to be the string matching the type of images you want to download.
-2. run `get_data.py`
-3. run `utils.py`, and there should be a number that is outputted
-4. go to `utils.py`, and change `HyperParameters.MAX_STROKES` to be that number
-5. run `clean_data.py`
-6. run `train.py`
-7. run `load_model.py`
-8. success
+0. download [python](https://www.python.org/downloads/)
+1. download the repository
+2. cd into it
+3. install packages using `pip3 install -r requirements.txt`
+4. go to `utils.py` and change `HyperParameters.DATA_CATEGORY` to be the string matching the type of images you want to download.
+5. run `get_data.py`
+6. run `utils.py`, and there should be a number that is outputted
+7. go to `utils.py`, and change `HyperParameters.MAX_STROKES` to be that number
+8. run `clean_data.py`
+9. run `train.py` (will take long)
+10. run `load_model.py`
+11. success
 
 ## todo
 
