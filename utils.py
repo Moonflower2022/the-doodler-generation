@@ -8,6 +8,9 @@ device = (
     else "mps" if torch.backends.mps.is_available() else "cpu"
 )
 
+print_frequency = 1
+save_frequency = 1
+log_frequency = 1
 
 def safe_exp(x, max_val=10.0):
     return torch.exp(torch.clamp(x, max=max_val))

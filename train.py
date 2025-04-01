@@ -5,11 +5,15 @@ from utils import (
     log_tensor_detailed_stats,
     safe_divide,
     replace_last,
+    log_frequency,
+    save_frequency,
+    print_frequency
 )
 from clean_data import SketchesDataset
 from model import SketchDecoder
 
 from torch.utils.data import DataLoader
+from torch.cuda.amp import autocast, GradScaler
 from torch import nn
 from torch import optim
 import torch
@@ -127,31 +131,6 @@ def vectorized_reconstruction_loss(predictions, labels, logger=None):
     return total_loss
 
 
-def log_gradient_statistics(model, logger):
-    """
-    log gradient statistics for model parameters
-    """
-    total_norm = 0
-    parameter_norms = {}
-
-    for name, param in model.named_parameters():
-        if param.grad is not None:
-            # Gradient norm
-            param_norm = param.grad.detach().norm(2).item()
-            total_norm += param_norm**2
-            parameter_norms[name] = param_norm
-
-    total_norm = total_norm**0.5
-
-    # Log total gradient norm
-    logger.info(f"Total Gradient Norm: {total_norm:.4f}")
-
-    # Log top 5 parameter gradients by norm
-    sorted_grads = sorted(parameter_norms.items(), key=lambda x: x[1], reverse=True)[:5]
-    for name, norm in sorted_grads:
-        logger.info(f"Gradient Norm - {name}: {norm:.4f}")
-
-
 def train_model(debug, model_path=None):
     print("loading data:", end="\r")
 
@@ -188,15 +167,9 @@ def train_model(debug, model_path=None):
         f"{folder_name}/model.log",
         level=logging.INFO if debug else logging.CRITICAL,
     )
-    gradient_logger = get_logger(
-        f"{__name__}.gradient",
-        f"{folder_name}/gradient.log",
-        level=logging.INFO if debug else logging.CRITICAL,
-    )
 
     logger.info("Training started")
     model_logger.info("Model logging initialized")
-    gradient_logger.info("Gradient logging initialized")
 
     if model_path:
         info = torch.load(model_path, weights_only=False)
@@ -216,11 +189,6 @@ def train_model(debug, model_path=None):
     scheduler = optim.lr_scheduler.ExponentialLR(
         optimizer, gamma=HyperParameters.LEARNING_RATE_DECAY
     )
-
-    print_frequency = 1
-    save_frequency = 1
-    log_frequency = 1
-    gradient_log_frequency = 10
 
     start_time = time.time()
 
@@ -251,10 +219,6 @@ def train_model(debug, model_path=None):
             for param_group in optimizer.param_groups:
                 if param_group["lr"] < HyperParameters.MIN_LEARNING_RATE:
                     param_group["lr"] = HyperParameters.MIN_LEARNING_RATE
-
-        # Gradient logging
-        if (epoch + 1) % gradient_log_frequency == 0:
-            log_gradient_statistics(model, gradient_logger)
 
         if (epoch + 1) % print_frequency == 0:
             print(f"[Epoch {epoch + 1}] loss: {loss.item():.2f}")
