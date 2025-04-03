@@ -2,9 +2,6 @@ import torch
 from utils import HyperParameters, log_tensor_detailed_stats, safe_exp
 from torch import nn
 
-torch.autograd.set_detect_anomaly(True)
-
-
 def sample_bivariate_normal(sigma_x, sigma_y, rho_xy, mu_x, mu_y):
     mean = torch.tensor([mu_x, mu_y])
     covariance_matrix = torch.tensor(

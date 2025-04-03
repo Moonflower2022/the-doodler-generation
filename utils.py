@@ -12,6 +12,9 @@ print_frequency = 1
 save_frequency = 1
 log_frequency = 1
 
+LOG_FORMAT = "%(asctime)s [%(levelname)s] (%(filename)s:%(lineno)d): %(message)s"
+formatter = logging.Formatter(LOG_FORMAT)
+
 def safe_exp(x, max_val=10.0):
     return torch.exp(torch.clamp(x, max=max_val))
 
@@ -71,9 +74,9 @@ class HyperParameters:
     LATENT_VECTOR_SIZE = 128  # not used
 
     # HYPER PARAMETERS (can change while training the same model)
-    LEARNING_RATE = 1e-3
+    LEARNING_RATE = 1e-5
     LEARNING_RATE_DECAY = 0.996
-    MIN_LEARNING_RATE = 1e-5
+    MIN_LEARNING_RATE = 1e-6
     BATCH_SIZE = 100
     DROPOUT = 0.0
     GRAD_CLIP = 1.0
@@ -81,7 +84,7 @@ class HyperParameters:
 
     def state_dict():
         return {
-            key.lower(): value
+            key: value
             for key, value in vars(HyperParameters).items()
             if not key.startswith("__") or key == "state_dict"
         }
@@ -92,9 +95,6 @@ class HyperParameters:
             if hasattr(self, key):
                 setattr(self, key, value)
 
-
-LOG_FORMAT = "%(asctime)s [%(levelname)s] (%(filename)s:%(lineno)d): %(message)s"
-formatter = logging.Formatter(LOG_FORMAT)
 
 
 def get_logger(name, log_file, level=logging.INFO):
@@ -147,3 +147,6 @@ if __name__ == "__main__":
     drawings = np.load(load_path, allow_pickle=True, encoding="latin1")
 
     print(get_max_strokes(drawings["train"]))
+
+    hyper_parameters = HyperParameters()
+    print(HyperParameters.state_dict())
