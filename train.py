@@ -13,7 +13,6 @@ from clean_data import SketchesDataset
 from model import SketchDecoder
 
 from torch.utils.data import DataLoader
-from torch.cuda.amp import autocast, GradScaler
 from torch import nn
 from torch import optim
 import torch
@@ -25,27 +24,13 @@ import argparse
 
 
 def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy, logger=None):
-    z_x_top = dx - mu_x
-    log_tensor_detailed_stats(logger, z_x_top, "z_x_top")
-    z_x_bottom = sigma_x
-    log_tensor_detailed_stats(logger, z_x_bottom, "z_x_bottom")
-    z_x = (safe_divide(z_x_top, z_x_bottom)) ** 2
+    z_x = ((dx - mu_x) / sigma_x) ** 2
     log_tensor_detailed_stats(logger, z_x, "z_x")
 
-    z_y_top = dy - mu_y
-    log_tensor_detailed_stats(logger, z_y_top, "z_y_top")
-    z_y_bottom = sigma_y
-    log_tensor_detailed_stats(logger, z_y_bottom, "z_y_bottom")
-    z_y = (safe_divide(z_y_top, z_y_bottom)) ** 2
+    z_y = ((dy - mu_y) / sigma_y) ** 2
     log_tensor_detailed_stats(logger, z_y, "z_y")
 
-    z_xy_top = (dx - mu_x) * (dy - mu_y)
-    log_tensor_detailed_stats(logger, z_xy_top, "z_xy_top")
-    z_xy_bottom = sigma_x * sigma_y
-    log_tensor_detailed_stats(logger, z_xy_bottom, "z_xy_bottom")
-    z_xy_factor = 2 * rho_xy
-    log_tensor_detailed_stats(logger, z_xy_factor, "z_xy_factor")
-    z_xy = safe_divide(z_xy_top, z_xy_bottom) * z_xy_factor
+    z_xy = 2 * rho_xy * (dx - mu_x) * (dy - mu_y) / (sigma_x * sigma_y)
     log_tensor_detailed_stats(logger, z_xy, "z_xy")
 
     z = z_x + z_y - z_xy
@@ -54,13 +39,13 @@ def bivariate_normal_pdf(dx, dy, sigma_x, sigma_y, mu_x, mu_y, rho_xy, logger=No
     clipped_z = torch.clamp(z, 1e-5, 1e7)
     log_tensor_detailed_stats(logger, clipped_z, "clipped_z")
 
-    top = torch.exp(safe_divide(-clipped_z, 2 * (1 - rho_xy**2)))
-    log_tensor_detailed_stats(logger, top, "top")
+    exp_term = torch.exp(-clipped_z / (2 * (1 - rho_xy**2)))
+    log_tensor_detailed_stats(logger, exp_term, "exp_term")
 
     norm = 2 * np.pi * sigma_x * sigma_y * torch.sqrt(1 - rho_xy**2)
     log_tensor_detailed_stats(logger, norm, "bottom")
 
-    return safe_divide(top, norm)
+    return exp_term / norm
 
 
 def vectorized_reconstruction_loss(predictions, labels, logger=None):
@@ -160,12 +145,12 @@ def train_model(debug, model_path=None):
     logger = get_logger(
         f"{__name__}.info",
         f"{folder_name}/train.log",
-        level=logging.INFO if debug else logging.CRITICAL,
+        level=logging.INFO,
     )
     model_logger = get_logger(
         f"{__name__}.model",
         f"{folder_name}/model.log",
-        level=logging.INFO if debug else logging.CRITICAL,
+        level=logging.INFO,
     )
 
     logger.info("Training started")
@@ -263,5 +248,7 @@ if __name__ == "__main__":
         print("Debug mode enabled.")
 
     model_path = args.load
+    
+    torch.autograd.set_detect_anomaly(args.debug) # args.debug is bool
 
     train_model(args.debug, model_path=model_path)
