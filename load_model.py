@@ -10,7 +10,7 @@ import argparse
 
 def load_model(model_path=None):
     if model_path is None:
-        with open("models/latest_experiment.txt", "r") as file:
+        with open("latest_experiment.txt", "r") as file:
             model_path = file.read()
 
     info = torch.load(model_path, weights_only=False)

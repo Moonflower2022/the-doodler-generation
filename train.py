@@ -135,7 +135,7 @@ def train_model(debug, model_path=None):
         break
 
     base_folder_name = (
-        f"models/decoder_{HyperParameters.DATA_CATEGORY}"
+        f"temp_models/decoder_{HyperParameters.DATA_CATEGORY}"
         if not model_path
         else replace_last(f"{model_path}+", "/", "_")
     )
@@ -225,7 +225,7 @@ def train_model(debug, model_path=None):
                 },
                 save_filename,
             )
-            with open("models/latest_experiment.txt", "w") as output_file:
+            with open("latest_experiment.txt", "w") as output_file:
                 output_file.write(save_filename)
 
         scheduler.step()

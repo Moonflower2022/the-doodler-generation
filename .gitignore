@@ -162,7 +162,7 @@ cython_debug/
 #.idea/
 
 data
-models
+temp_models
 **/latest_experiment.txt/**
 
 .DS_Store
