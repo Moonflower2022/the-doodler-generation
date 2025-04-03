@@ -19,10 +19,15 @@ Generation models for the quick, draw! dataset by google that are based on the S
 
 ## todo
 
+-   make model better
+    -   currently when training even overnight with scheduling LR its kinda bad
+        -   especially on harder classes
 -   data
     -   find only the data that google's model was able to classify
 -   generate lots of images
 -   make game
+    -   1. draw a thing, send a link to friend, they have to guess which one you drew out of yours and a generated one
+    -   2. draw a stroke, model draw a stroke (repeat)
 
 ## references
 
