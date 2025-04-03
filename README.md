@@ -2,6 +2,8 @@
 
 Generation models for the quick, draw! dataset by google that are based on the SketchRNN model.
 
+**Work in progress**
+
 ## usage
 
 0. download [python](https://www.python.org/downloads/)
